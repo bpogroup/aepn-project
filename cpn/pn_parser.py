@@ -40,7 +40,7 @@ class PNLexer:
         return t
 
     def t_TEXT(self, t):
-        r'[a-zA-Z][a-zA-Z0-9]*'
+        r'[;a-zA-Z][a-zA-Z0-9;]*' #DIRTY! the ; character is treated as text to allow markings of arbitrary size
         if t.value in self.reserved:  # Check for reserved words
             t.type = self.reserved[t.value]
         else:
@@ -83,7 +83,7 @@ class PNParser:
     def p_transitions(self, p):
         '''transitions : transition COMMA transitions
                        | transition'''
-        p[0] = [p[1]] if len(p) == 2 else [p[1]] + p[3]
+        p[0] = [p[1]] if len(p) == 2 else [p[1]] + p[3] 
 
     def p_arcs(self, p):
         '''arcs : arc COMMA arcs
@@ -100,16 +100,33 @@ class PNParser:
         p[0] = PlaceNode(p[1], "")
 
     def p_transition(self, p):
-        '''transition : LABEL LPAREN RPAREN'''
-        p[0] = TransitionNode(p[1], "")
+        '''transition : LABEL LPAREN RPAREN
+                      | LABEL LPAREN LABEL COMMA NUMBER RPAREN'''
+        if len(p) == 4:
+            p[0] = TransitionNode(p[1])
+        elif len(p) == 7:
+            p[0] = TransitionNode(p[1], p[3], p[5])
+        else:
+            raise Exception(f"Invalid transition token")
 
     def p_arc(self, p):
         '''arc : LPAREN LABEL COMMA LABEL RPAREN
-               | LPAREN LABEL COMMA LABEL COMMA LABEL RPAREN'''
-        if len(p) == 6:
+               | LPAREN LABEL COMMA LABEL COMMA LABEL RPAREN
+               | LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS NUMBER RPAREN
+               | LPAREN LABEL COMMA LABEL COMMA LABEL COMMA NUMBER COMMA NUMBER RPAREN
+               | LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN'''
+        if len(p) == 6: #unlabeled arc
             p[0] = ArcNode(p[2], p[4])
-        else:
+        elif len(p) == 8: #labeled arc
             p[0] = ArcNode(p[2], p[4], p[6])
+        elif len(p) == 11: #fixed delay labelled time increasing arc (outgoing from transition)
+            p[0] = ArcNode(p[2], p[4], p[6], increment=p[9])
+        elif len(p) == 12: #labelled time windowed arc (incoming in transition) NOT REALLY NEEDED
+            p[0] = ArcNode(p[2], p[4], p[6], tw_low=p[8], tw_high=p[10])
+        elif len(p) == 14: #variable delay labelled time increasing arc (outgoing from transition)
+            p[0] = ArcNode(p[2], p[4], p[6], delay_type=p[9], params=p[11])
+        else:
+            raise Exception("Invalid arc token")
 
     def p_marking(self, p):
         '''marking : LPAREN LABEL COMMA tokens RPAREN'''

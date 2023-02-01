@@ -166,7 +166,7 @@ class PetriNet:
         The variable can also be None (the default), in which case we assume the arc only processes 'black' tokens.
         :param src: a place or transition
         :param dst: a place or transition
-        :param var: a string or None if there is no variable.
+        :param inscription: a string or None if there is no inscription.
         """
         if src not in self.places and src not in self.transitions:
             raise Exception("Attempting to create an arc from a non-existing source.")
@@ -300,12 +300,12 @@ class PetriNet:
         # now return the untimed bindings + the timed bindings that have time <= clock
         return untimed_bindings + [(binding, time) for (binding, time) in timed_bindings if time <= self.clock]
 
-    def fire(self, timedbinding):
+    def fire(self, timed_binding):
         """
         Fires the specified timed binding.
         Binding is a tuple ([(arc, token), (arc, token), ...], time)
         """
-        (binding, time) = timedbinding
+        (binding, time) = timed_binding
         # process incoming places:
         transition = None
         variable_assignment = dict()

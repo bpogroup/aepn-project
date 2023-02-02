@@ -221,6 +221,16 @@ class PetriNet:
             raise Exception("Cannot find place with id '" + place_id + "'.")
         self.add_mark(self.by_id[place_id], token, count)
 
+    def add_marks_by_id(self, place_id, tokens):
+        """
+        Marks a place with multiple tokens. The place is identified by its identifier.
+        Each token has a value (can also be None to indicate a black token).
+        :param place_id: a place identifier
+        :param token2: the list of tokens to be added
+        """
+        for token in tokens:
+            self.add_mark_by_id(place_id, token)
+
     def tokens_combinations(self, transition):
         # create all possible combinations of incoming token values
         bindings = [[]]
@@ -345,7 +355,7 @@ class PetriNet:
         return run
 
 
-if __name__ == "__main__":
+def test_simple():
     my_functions = \
 '''
 def f(test):
@@ -379,5 +389,98 @@ def f(test):
     print()
 
     test_run = pn.simulation_run(10)
+    for test_binding in test_run:
+        print(test_binding)
+
+if __name__ == "__main__":
+    my_functions = \
+'''
+import random
+
+B1 = 0
+B2 = 1
+B3 = 2
+B4 = 3
+B5 = 4
+P1 = 5
+P2 = 6
+T1 = 7
+S1 = 8
+S2 = 9
+S3 = 10
+S4 = 11
+S5 = 12
+S6 = 13
+S7 = 14
+S8 = 15
+S9 = 16
+TIME = 17
+'''
+    pn = PetriNet(my_functions)
+
+    # INIT
+    pn.add_place(Place("to plan"))
+    pn.add_mark_by_id("to plan", Token((0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 3, 3, 3, 0, 0, 0)))
+
+    # PLAN
+    pn.add_transition(Transition("plan", "b1 + b2 + b3 + 2*b4 + 2*b5 <= 6 and "
+                                         "t1 <= b[S7] and "
+                                         "p1 <= b[S2] and "
+                                         "p2 <= b[S4] and "
+                                         "p1 + p2 <= b[S3]"))
+    pn.add_arc_by_ids("to plan", "plan", "b")
+    pn.add_place(Place("to evolve"))
+    pn.add_arc_by_ids("plan", "to evolve", "(b1, b2, b3, b4, b5, p1, p2, t1, b[S1], b[S2], b[S3], b[S4], b[S5], b[S6], b[S7], b[S8], b[S9], b[TIME])")
+    pn.add_place(Place("b1"))
+    pn.add_marks_by_id("b1", [Token(0), Token(1), Token(2), Token(3)])
+    pn.add_arc_by_ids("b1", "plan", "b1")
+    pn.add_arc_by_ids("plan", "b1", "b1")
+    pn.add_place(Place("b2"))
+    pn.add_marks_by_id("b2", [Token(0), Token(1), Token(2), Token(3)])
+    pn.add_arc_by_ids("b2", "plan", "b2")
+    pn.add_arc_by_ids("plan", "b2", "b2")
+    pn.add_place(Place("b3"))
+    pn.add_marks_by_id("b3", [Token(0), Token(1), Token(2), Token(3)])
+    pn.add_arc_by_ids("b3", "plan", "b3")
+    pn.add_arc_by_ids("plan", "b3", "b3")
+    pn.add_place(Place("b4"))
+    pn.add_marks_by_id("b4", [Token(0)])
+    pn.add_arc_by_ids("b4", "plan", "b4")
+    pn.add_arc_by_ids("plan", "b4", "b4")
+    pn.add_place(Place("b5"))
+    pn.add_marks_by_id("b5", [Token(0)])
+    pn.add_arc_by_ids("b5", "plan", "b5")
+    pn.add_arc_by_ids("plan", "b5", "b5")
+    pn.add_place(Place("p1"))
+    pn.add_marks_by_id("p1", [Token(0), Token(1), Token(2), Token(3)])
+    pn.add_arc_by_ids("p1", "plan", "p1")
+    pn.add_arc_by_ids("plan", "p1", "p1")
+    pn.add_place(Place("p2"))
+    pn.add_marks_by_id("p2", [Token(0), Token(1), Token(2), Token(3)])
+    pn.add_arc_by_ids("p2", "plan", "p2")
+    pn.add_arc_by_ids("plan", "p2", "p2")
+    pn.add_place(Place("t1"))
+    pn.add_marks_by_id("t1", [Token(0), Token(1), Token(2), Token(3)])
+    pn.add_arc_by_ids("t1", "plan", "t1")
+    pn.add_arc_by_ids("plan", "t1", "t1")
+
+    # EVOLVE
+    pn.add_transition(Transition("evolve"))
+    pn.add_arc_by_ids("to evolve", "evolve", "b")
+    pn.add_place(Place("to demand"))
+    pn.add_arc_by_ids("evolve", "to demand", "(0, 0, 0, 0, 0, 0, 0, 0, b[B2], b[B1], b[S1], b[B3], b[P1], b[P2], b[B4], b[B5], b[T1], b[TIME])")
+    pn.add_place(Place("demand"))
+    pn.add_arc_by_ids("evolve", "demand", "(random.choice(['S7', 'S8', 'S9']), random.choice([1, 2, 3, 4, 5, 6]))")
+
+    # DEMAND
+    pn.add_transition(Transition("process demand"))
+    pn.add_arc_by_ids("to demand", "process demand", "b")
+    pn.add_arc_by_ids("demand", "process demand", "d")
+    pn.add_arc_by_ids("process demand", "to plan", "(0, 0, 0, 0, 0, 0, 0, 0, b[S1], b[S2], b[S3], b[S4], b[S5], b[S6], max(b[S7]-d[1], 0) if d[0]=='S7' else b[S7], max(b[S8]-d[1], 0) if d[0]=='S8' else b[S8], max(b[S9]-d[1], 0) if d[0]=='S9' else b[S9], b[TIME])")
+
+    print(pn)
+    print()
+
+    test_run = pn.simulation_run(31)
     for test_binding in test_run:
         print(test_binding)

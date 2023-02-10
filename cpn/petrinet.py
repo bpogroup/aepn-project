@@ -398,6 +398,7 @@ class AEPetriNet(PetriNet):
                         exec(compile(self.additional_functions + "result = " + t.guard, "<string>", "exec"), variable_values)
                         enabled = variable_values['result']
                         if enabled: color_associations.append(v_v_original)
+                     else: color_associations.append(**variable_values)
             
 
             return color_associations
@@ -405,15 +406,15 @@ class AEPetriNet(PetriNet):
         else:
             #create a list of size n elements, each a tuple, where n is the amount of places connected for every 'a' transition in the network, for every color present in the node            
             color_associations = []
-            
-            #get colors_set attribute of all places that are the src of arcs whose dst is a transition with tag=='a'
-            colors_set = [list(p.colors_set) for p in self.places if any([a.dst.tag=='a' for a in p.outgoing])]
 
             for t in [t for t in self.transitions if t.tag=='a']:
-                n_inc_arcs = len([a for a in self.arcs if a.dst == t])
-                associations = list(itertools.product(*colors_set))#all combinations of size n_inc_arcs, possibly with repeating elements
-                variables = [a.inscription for a in self.arcs if a in t.incoming]#all the variables of arcs incoming to t
+                #get colors_set attribute of all places that are the src of arcs whose dst is a transition with tag=='a'
+                colors_set = [list(p.colors_set) for p in self.places if any([a.dst==t for a in p.outgoing])]
 
+                n_inc_arcs = len([a for a in self.arcs if a.dst == t])
+                #associations = list(itertools.product(*colors_set))#all combinations of size n_inc_arcs, possibly with repeating elements
+                associations = list(itertools.product(*colors_set))
+                variables = [a.inscription for a in self.arcs if a in t.incoming]#all the variables of arcs incoming to t
 
                 #create list of dictionaries, each of which contains an association that is a possible binding
                 variable_values_list = []
@@ -427,6 +428,7 @@ class AEPetriNet(PetriNet):
                         exec(compile(self.additional_functions + "result = " + t.guard, "<string>", "exec"), variable_values)
                         enabled = variable_values['result']
                         if enabled: color_associations.append(v_v_original)
+                     else: color_associations.append(**variable_values)
             
 
             return color_associations #WARNING: not sorted
@@ -621,8 +623,8 @@ if __name__ == "__main__":
     test_bin_packing = False #test a-e cpn for bin packing problem
     test_vrp = True #test a-e cpn for production line problem (simplified routing)
     
-    test_simulation = True
-    test_training = False
+    test_simulation = False
+    test_training = True
     test_inference = False
     
     
@@ -738,14 +740,14 @@ if __name__ == "__main__":
             for test_binding in test_run:
                 print(test_binding)
 
-    elif test_vrp: #TODO
+    elif test_vrp:
         f = open('./cpn/color_functions.py', 'r') #read functions file as txt
         temp = f.read()
         f.close()
         my_functions = temp #set additional functions
         pn = AEPetriNet(my_functions)
 
-        pn.add_place(Place("arrival", colors_set={'{"x":0,"y":0}','{"x":1,"y":0}','{"x":0,"y":1}','{"x":1,"y":1}'}))
+        pn.add_place(Place("arrival", colors_set={'{"x":1,"y":1,"ttl":2}','{"x":1,"y":2,"ttl":2}','{"x":2,"y":1,"ttl":2}','{"x":2,"y":2,"ttl":2}'}))
         pn.add_place(Place("ready", colors_set={'{"x":1,"y":1,"ttl":2}', '{"x":1,"y":1,"ttl":1}', '{"x":1,"y":1,"ttl":0}'}))
         pn.add_place(Place("agents", colors_set={'{"x":0,"y":0}','{"x":1,"y":0}','{"x":0,"y":1}','{"x":1,"y":1}'}))
         pn.add_place(Place("positions", colors_set={'{"x":0,"y":0}','{"x":1,"y":0}','{"x":0,"y":1}','{"x":1,"y":1}'}))
@@ -775,7 +777,6 @@ if __name__ == "__main__":
         pn.add_mark_by_id("positions", Token('{"x":1,"y":0}', 0))
         pn.add_mark_by_id("positions", Token('{"x":1,"y":1}', 0))
         pn.add_mark_by_id("agents", Token('{"x":0,"y":0}', 1))
-        #pn.add_mark_by_id("arrival", Token('{"x":0,"y":1,"ttl":5}', 0))
         pn.add_mark_by_id("arrival", Token('{"x":1,"y":1,"ttl":2}', 0))
 
         print(pn)

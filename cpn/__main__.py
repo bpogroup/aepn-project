@@ -8,7 +8,7 @@ test_classical_pn = False
 
 test_colored_pn = False
 
-train_ae_pn = True
+train_ae_pn = False
 load_ppo = False
 
 test_ae_pn = True

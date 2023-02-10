@@ -6,9 +6,9 @@ _tabversion = '3.10'
 
 _lr_method = 'LALR'
 
-_lr_signature = 'ARCS CLOSESET COMMA EQUALS EXPRESSION LABEL LPAREN MARKINGS NUMBER OPENSET PLACES PLUSPLUS RPAREN TRANSITIONSpetrinet : PLACES EQUALS OPENSET places CLOSESET                      TRANSITIONS EQUALS OPENSET transitions CLOSESET                      ARCS EQUALS OPENSET arcs CLOSESET                      MARKINGS EQUALS OPENSET markings CLOSESETplaces : place COMMA places\n                  | placetransitions : transition COMMA transitions\n                       | transitionarcs : arc COMMA arcs\n                | arcmarkings : marking COMMA markings\n                    | markingplace : LABEL LPAREN RPARENtransition : LABEL LPAREN RPAREN\n                      | LABEL LPAREN LABEL COMMA NUMBER RPARENarc : LPAREN LABEL COMMA LABEL RPAREN\n               | LPAREN LABEL COMMA LABEL COMMA LABEL RPAREN\n               | LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS NUMBER RPAREN\n               | LPAREN LABEL COMMA LABEL COMMA LABEL COMMA NUMBER COMMA NUMBER RPAREN\n               | LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPARENmarking : LPAREN LABEL COMMA tokens RPARENtokens : NUMBER EXPRESSION\n                  | NUMBER EXPRESSION PLUSPLUS tokens'
+_lr_signature = 'ARCS CLOSESET COLORTYPE COMMA EQUALS EXPRESSION LABEL LPAREN MARKINGS NUMBER OPENSET PLACES PLUSPLUS RPAREN TRANSITIONSpetrinet : COLORTYPE EQUALS OPENSET colortype CLOSESET                      PLACES EQUALS OPENSET places CLOSESET                      TRANSITIONS EQUALS OPENSET transitions CLOSESET                      ARCS EQUALS OPENSET arcs CLOSESET                      MARKINGS EQUALS OPENSET markings CLOSESETcolortype : typeplaces : place COMMA places\n                  | placetransitions : transition COMMA transitions\n                       | transitionarcs : arc COMMA arcs\n                | arcmarkings : marking COMMA markings\n                    | markingtype : LABELplace : LABEL LPAREN RPARENtransition : LABEL LPAREN RPAREN\n                      | LABEL LPAREN LABEL COMMA NUMBER RPARENarc : LPAREN LABEL COMMA LABEL RPAREN\n               | LPAREN LABEL COMMA LABEL COMMA LABEL RPAREN\n               | LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS NUMBER RPAREN\n               | LPAREN LABEL COMMA LABEL COMMA LABEL COMMA NUMBER COMMA NUMBER RPAREN\n               | LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPARENmarking : LPAREN LABEL COMMA tokens RPARENtokens : NUMBER EXPRESSION\n                  | NUMBER EXPRESSION PLUSPLUS tokens'
     
-_lr_action_items = {'PLACES':([0,],[2,]),'$end':([1,49,],[0,-1,]),'EQUALS':([2,11,22,37,],[3,14,26,40,]),'OPENSET':([3,14,26,40,],[4,15,28,42,]),'LABEL':([4,9,15,20,21,32,39,43,47,56,],[7,7,18,18,24,36,41,48,51,60,]),'CLOSESET':([5,6,12,13,16,17,23,25,30,31,33,38,44,45,46,53,54,63,66,70,73,],[8,-3,-2,-10,19,-5,-4,-11,34,-7,-12,-6,-13,49,-9,-14,-8,-18,-15,-16,-17,]),'COMMA':([6,13,17,24,25,31,33,36,41,44,46,48,51,53,57,63,66,70,73,],[9,-10,20,27,-11,35,-12,39,43,-13,50,52,55,-14,62,-18,-15,-16,-17,]),'LPAREN':([7,18,28,35,42,50,60,],[10,21,32,32,47,47,65,]),'TRANSITIONS':([8,],[11,]),'RPAREN':([10,21,29,41,48,58,61,64,67,69,71,72,],[13,25,33,44,53,63,66,-19,70,72,-20,73,]),'ARCS':([19,],[22,]),'NUMBER':([27,52,55,56,62,65,68,],[29,57,59,61,67,69,59,]),'MARKINGS':([34,],[37,]),'PLUSPLUS':([52,64,],[56,68,]),'EXPRESSION':([59,],[64,]),}
+_lr_action_items = {'COLORTYPE':([0,],[2,]),'$end':([1,56,],[0,-1,]),'EQUALS':([2,9,18,29,44,],[3,10,21,33,47,]),'OPENSET':([3,10,21,33,47,],[4,11,22,35,49,]),'LABEL':([4,11,16,22,27,28,39,46,50,54,63,],[7,14,14,25,25,31,43,48,55,58,67,]),'CLOSESET':([5,6,7,12,13,19,20,23,24,30,32,37,38,40,45,51,52,53,60,61,70,73,77,80,],[8,-2,-11,15,-4,-3,-12,26,-6,-5,-13,41,-8,-14,-7,-15,56,-10,-16,-9,-20,-17,-18,-19,]),'PLACES':([8,],[9,]),'COMMA':([13,20,24,31,32,38,40,43,48,51,53,55,58,60,64,70,73,77,80,],[16,-12,27,34,-13,42,-14,46,50,-15,57,59,62,-16,69,-20,-17,-18,-19,]),'LPAREN':([14,25,35,42,49,57,67,],[17,28,39,39,54,54,72,]),'TRANSITIONS':([15,],[18,]),'RPAREN':([17,28,36,48,55,65,68,71,74,76,78,79,],[20,32,40,51,60,70,73,-21,77,79,-22,80,]),'ARCS':([26,],[29,]),'NUMBER':([34,59,62,63,69,72,75,],[36,64,66,68,74,76,66,]),'MARKINGS':([41,],[44,]),'PLUSPLUS':([59,71,],[63,75,]),'EXPRESSION':([66,],[71,]),}
 
 _lr_action = {}
 for _k, _v in _lr_action_items.items():
@@ -17,7 +17,7 @@ for _k, _v in _lr_action_items.items():
       _lr_action[_x][_k] = _y
 del _lr_action_items
 
-_lr_goto_items = {'petrinet':([0,],[1,]),'places':([4,9,],[5,12,]),'place':([4,9,],[6,6,]),'transitions':([15,20,],[16,23,]),'transition':([15,20,],[17,17,]),'arcs':([28,35,],[30,38,]),'arc':([28,35,],[31,31,]),'markings':([42,50,],[45,54,]),'marking':([42,50,],[46,46,]),'tokens':([55,68,],[58,71,]),}
+_lr_goto_items = {'petrinet':([0,],[1,]),'colortype':([4,],[5,]),'type':([4,],[6,]),'places':([11,16,],[12,19,]),'place':([11,16,],[13,13,]),'transitions':([22,27,],[23,30,]),'transition':([22,27,],[24,24,]),'arcs':([35,42,],[37,45,]),'arc':([35,42,],[38,38,]),'markings':([49,57,],[52,61,]),'marking':([49,57,],[53,53,]),'tokens':([62,75,],[65,78,]),}
 
 _lr_goto = {}
 for _k, _v in _lr_goto_items.items():
@@ -27,24 +27,26 @@ for _k, _v in _lr_goto_items.items():
 del _lr_goto_items
 _lr_productions = [
   ("S' -> petrinet","S'",1,None,None,None),
-  ('petrinet -> PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET','petrinet',20,'p_petrinet','pn_parser.py',72),
-  ('places -> place COMMA places','places',3,'p_places','pn_parser.py',79),
-  ('places -> place','places',1,'p_places','pn_parser.py',80),
-  ('transitions -> transition COMMA transitions','transitions',3,'p_transitions','pn_parser.py',84),
-  ('transitions -> transition','transitions',1,'p_transitions','pn_parser.py',85),
-  ('arcs -> arc COMMA arcs','arcs',3,'p_arcs','pn_parser.py',89),
-  ('arcs -> arc','arcs',1,'p_arcs','pn_parser.py',90),
-  ('markings -> marking COMMA markings','markings',3,'p_markings','pn_parser.py',94),
-  ('markings -> marking','markings',1,'p_markings','pn_parser.py',95),
-  ('place -> LABEL LPAREN RPAREN','place',3,'p_place','pn_parser.py',99),
-  ('transition -> LABEL LPAREN RPAREN','transition',3,'p_transition','pn_parser.py',103),
-  ('transition -> LABEL LPAREN LABEL COMMA NUMBER RPAREN','transition',6,'p_transition','pn_parser.py',104),
-  ('arc -> LPAREN LABEL COMMA LABEL RPAREN','arc',5,'p_arc','pn_parser.py',113),
-  ('arc -> LPAREN LABEL COMMA LABEL COMMA LABEL RPAREN','arc',7,'p_arc','pn_parser.py',114),
-  ('arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS NUMBER RPAREN','arc',10,'p_arc','pn_parser.py',115),
-  ('arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA NUMBER COMMA NUMBER RPAREN','arc',11,'p_arc','pn_parser.py',116),
-  ('arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN','arc',13,'p_arc','pn_parser.py',117),
-  ('marking -> LPAREN LABEL COMMA tokens RPAREN','marking',5,'p_marking','pn_parser.py',132),
-  ('tokens -> NUMBER EXPRESSION','tokens',2,'p_tokens','pn_parser.py',136),
-  ('tokens -> NUMBER EXPRESSION PLUSPLUS tokens','tokens',4,'p_tokens','pn_parser.py',137),
+  ('petrinet -> COLORTYPE EQUALS OPENSET colortype CLOSESET PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET','petrinet',25,'p_petrinet','pn_parser.py',73),
+  ('colortype -> type','colortype',1,'p_color_type','pn_parser.py',81),
+  ('places -> place COMMA places','places',3,'p_places','pn_parser.py',85),
+  ('places -> place','places',1,'p_places','pn_parser.py',86),
+  ('transitions -> transition COMMA transitions','transitions',3,'p_transitions','pn_parser.py',90),
+  ('transitions -> transition','transitions',1,'p_transitions','pn_parser.py',91),
+  ('arcs -> arc COMMA arcs','arcs',3,'p_arcs','pn_parser.py',95),
+  ('arcs -> arc','arcs',1,'p_arcs','pn_parser.py',96),
+  ('markings -> marking COMMA markings','markings',3,'p_markings','pn_parser.py',100),
+  ('markings -> marking','markings',1,'p_markings','pn_parser.py',101),
+  ('type -> LABEL','type',1,'p_type','pn_parser.py',105),
+  ('place -> LABEL LPAREN RPAREN','place',3,'p_place','pn_parser.py',109),
+  ('transition -> LABEL LPAREN RPAREN','transition',3,'p_transition','pn_parser.py',113),
+  ('transition -> LABEL LPAREN LABEL COMMA NUMBER RPAREN','transition',6,'p_transition','pn_parser.py',114),
+  ('arc -> LPAREN LABEL COMMA LABEL RPAREN','arc',5,'p_arc','pn_parser.py',123),
+  ('arc -> LPAREN LABEL COMMA LABEL COMMA LABEL RPAREN','arc',7,'p_arc','pn_parser.py',124),
+  ('arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS NUMBER RPAREN','arc',10,'p_arc','pn_parser.py',125),
+  ('arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA NUMBER COMMA NUMBER RPAREN','arc',11,'p_arc','pn_parser.py',126),
+  ('arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN','arc',13,'p_arc','pn_parser.py',127),
+  ('marking -> LPAREN LABEL COMMA tokens RPAREN','marking',5,'p_marking','pn_parser.py',142),
+  ('tokens -> NUMBER EXPRESSION','tokens',2,'p_tokens','pn_parser.py',146),
+  ('tokens -> NUMBER EXPRESSION PLUSPLUS tokens','tokens',4,'p_tokens','pn_parser.py',147),
 ]

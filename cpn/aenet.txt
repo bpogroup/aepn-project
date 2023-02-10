@@ -1,3 +1,7 @@
+ColorType={
+associative
+}
+
 Places={
 arrival(),
 waiting(),
@@ -12,19 +16,23 @@ start(a, 0),
 complete(e, 1)
 }
 
+Guards={
+(start, compatibility(tas;res))
+}
+
 Arcs={
-(arrival, arrive, arr, 0, 0),
-(arrive, arrival, arr, ++1),
-(arrive, waiting, arr, ++1),
+(arrival, arrive, a, 0, 0),
+(arrive, arrival, a, ++1),
+(arrive, waiting, a, ++1),
 (waiting, start, tas, 0, 0),
 (resources, start, res, 0, 0),
-(start, busy, tas;res, ++ geometric(100)),
-(busy, complete, tas;res, 0, 0),
-(complete, resources, res, ++0),
-(complete, completed, tas, ++0)
+(start, busy, combine(`tas;res`), ++geometric(100)),
+(busy, complete, comb, 0, 0),
+(complete, resources, split(`comb;1`), ++0),
+(complete, completed, split(`comb;0`), ++0)
 }
 
 Markings={
-(resources,1`res:a;b`++1`res:b`),
-(arrival,1`arr:a`++1`arr:a`++1`arr:b`)
+(resources,1`a;b`++1`b`),
+(arrival,1`a`++1`b`)
 }

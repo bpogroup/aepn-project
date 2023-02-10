@@ -16,7 +16,8 @@ class ExpNode(ASTNode):
 
 
 class PetriNetNode(ASTNode):
-    def __init__(self, places, transitions, arcs, marking):
+    def __init__(self, color_type, places, transitions, arcs, marking):
+        self.color_type = color_type
         self.places = places
         self.transitions = transitions
         self.arcs = arcs
@@ -38,6 +39,12 @@ class PetriNetNode(ASTNode):
             result += str(m) + "\n"
         return result
 
+class ColorTypeNode(ASTNode):
+    def __init__(self, label):
+        self.label = label
+
+    def __str__(self):
+        return self.p_id
 
 class PlaceNode(ASTNode):
     def __init__(self, p_id, label):
@@ -59,14 +66,16 @@ class TransitionNode(ASTNode):
 
 
 class ArcNode(ASTNode):
-    def __init__(self, src_id, dst_id, variable=None, tw_low=None, tw_high=None, increment=None, delay_type=None, params=None):
+    def __init__(self, src_id, dst_id, variable=None, function=None, function_params=None, tw_low=None, tw_high=None, increment=None, delay_type=None, delay_params=None):
         self.src_id = src_id
         self.dst_id = dst_id
         self.variable = variable
+        self.function = function
+        self.function_params = function_params
         self.tw = (tw_low, tw_high)
         self.increment = increment
         self.delay_type = delay_type
-        self.params = params
+        self.delay_params = delay_params
 
     def __str__(self):
         result = "("
@@ -97,15 +106,17 @@ class MarkingNode(ASTNode):
 
 #TODO: composite colors in initial markings are not considered
 class TokenNode(ASTNode):
-    def __init__(self, count, key_value):
+    def __init__(self, count, values):
         self.count = count
-        key, values = key_value.split(':')
         values = values.split(';')
-        self.color = {key : values}
+        self.color = [values]
 
     def __str__(self):
         return str(self.count) + "`" + self.color + "`"
 
+class ColorTypeNode(ASTNode):
+    def __init__(self, type):
+        self.type = type
 
 class PetriNetCreatorVisitor:
     def __init__(self, net_type="PetriNet"):
@@ -117,6 +128,8 @@ class PetriNetCreatorVisitor:
             raise Exception("Invalid net type")
 
     def accept(self, element):
+        if type(element).__name__ == "ColorTypeNode":
+            self.pn.set_color_type(type)
         if type(element).__name__ == "PetriNetNode":
             for place_node in element.places:
                 place_node.visit(self)
@@ -135,12 +148,12 @@ class PetriNetCreatorVisitor:
                 self.pn.add_transition(TaggedTransition(element.t_id, element.tag, element.reward))
 
         elif type(element).__name__ == "ArcNode":
-            self.pn.add_arc_by_ids(element.src_id, element.dst_id, element.variable, element.tw, element.increment, element.delay_type, element.params)
+            self.pn.add_arc_by_ids(element.src_id, element.dst_id, element.variable, element.function, element.function_params, element.tw, element.increment, element.delay_type, element.delay_params)
         elif type(element).__name__ == "MarkingNode":
             tokens = dict()
             for token_node in element.tokens:
                 (value, count) = token_node.visit(self)
-                tokens[json.dumps(value)] = count #json module is used to obtain a string representation of the list and easily convert it back to list when needed
+                tokens[value] = count
             self.pn.add_mark_by_id(element.p_id, tokens)
         elif type(element).__name__ == "TokenNode":
             return element.color, element.count

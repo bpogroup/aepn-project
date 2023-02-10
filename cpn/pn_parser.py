@@ -1,10 +1,11 @@
 import ply.lex as lex
 import ply.yacc as yacc
-from cpn_ast import PetriNetNode, PlaceNode, TransitionNode, ArcNode, MarkingNode, TokenNode
+from cpn_ast import PetriNetNode, PlaceNode, TransitionNode, ArcNode, MarkingNode, TokenNode, ColorTypeNode
 
 
 class PNLexer:
     reserved = {
+        'ColorType': 'COLORTYPE',
         'Places': 'PLACES',
         'Transitions': 'TRANSITIONS',
         'Arcs': 'ARCS',
@@ -69,11 +70,16 @@ class PNParser:
     tokens = PNLexer.tokens
     
     def p_petrinet(self, p):
-        '''petrinet : PLACES EQUALS OPENSET places CLOSESET\
+        '''petrinet : COLORTYPE EQUALS OPENSET colortype CLOSESET\
+                      PLACES EQUALS OPENSET places CLOSESET\
                       TRANSITIONS EQUALS OPENSET transitions CLOSESET\
                       ARCS EQUALS OPENSET arcs CLOSESET\
                       MARKINGS EQUALS OPENSET markings CLOSESET'''
-        p[0] = PetriNetNode(p[4], p[9], p[14], p[19])
+        p[0] = PetriNetNode(p[4], p[9], p[14], p[19], p[24])
+
+    def p_color_type(self, p):
+        '''colortype : type'''
+        p[0] = [p[1]]
 
     def p_places(self, p):
         '''places : place COMMA places
@@ -95,6 +101,10 @@ class PNParser:
                     | marking'''
         p[0] = [p[1]] if len(p) == 2 else [p[1]] + p[3]
 
+    def p_type(self, p):
+        '''type : LABEL'''
+        p[0] = ColorTypeNode(p[1])
+
     def p_place(self, p):
         '''place : LABEL LPAREN RPAREN'''
         p[0] = PlaceNode(p[1], "")
@@ -114,7 +124,9 @@ class PNParser:
                | LPAREN LABEL COMMA LABEL COMMA LABEL RPAREN
                | LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS NUMBER RPAREN
                | LPAREN LABEL COMMA LABEL COMMA LABEL COMMA NUMBER COMMA NUMBER RPAREN
-               | LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN'''
+               | LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN
+               | LPAREN LABEL COMMA LABEL COMMA LABEL LPAREN EXPRESSION RPAREN COMMA PLUSPLUS NUMBER RPAREN
+               | LPAREN LABEL COMMA LABEL COMMA LABEL LPAREN EXPRESSION RPAREN COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN'''
         if len(p) == 6: #unlabeled arc
             p[0] = ArcNode(p[2], p[4])
         elif len(p) == 8: #labeled arc
@@ -123,8 +135,12 @@ class PNParser:
             p[0] = ArcNode(p[2], p[4], p[6], increment=p[9])
         elif len(p) == 12: #labelled time windowed arc (incoming in transition) NOT REALLY NEEDED
             p[0] = ArcNode(p[2], p[4], p[6], tw_low=p[8], tw_high=p[10])
-        elif len(p) == 14: #variable delay labelled time increasing arc (outgoing from transition)
-            p[0] = ArcNode(p[2], p[4], p[6], delay_type=p[9], params=p[11])
+        elif len(p) == 14 and type(p[11]) == int: #variable delay labelled time increasing arc (outgoing from transition)
+            p[0] = ArcNode(p[2], p[4], p[6], delay_type=p[9], delay_params=p[11])
+        elif len(p) == 14: #fixed delay time increasing arc (outgoing from transition) labelled with arc function
+            p[0] = ArcNode(p[2], p[4], function = p[6], function_params = p[8], increment=p[12])
+        elif len(p) == 17: #variable delay time increasing arc (outgoing from transition) labelled with arc function
+            p[0] = ArcNode(p[2], p[4], function = p[6], function_params = p[8], delay_type=p[11], delay_params=p[14])
         else:
             raise Exception("Invalid arc token")
 

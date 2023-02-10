@@ -1,4 +1,3 @@
-from urllib.request import proxy_bypass
 import gymnasium as gym
 from gym import spaces, Env
 from typing import List
@@ -30,23 +29,20 @@ class AEPN_Env(Env):
 		self.prev_tag = self.pn.tag
 
 	def step(self, action):
-
+        
 		old_rewards = self.pn.rewards
+		old_clock = self.pn.clock
 		observation, loc_i = self.pn.apply_action(self.pn_actions[action])
 		self.i += loc_i
 		terminated = False
 
-		#action penalty: we give a -1 reward to every action that 
-		evolution_penalty = 0
-
 		while self.pn.tag == "e" and not terminated:
-			evolution_penalty = -1
-			observation, terminated, self.i = self.pn.run_evolutions(self.run, self.i, self.active_model, self.prev_tag)
+			observation, terminated, self.i = self.pn.run_evolutions(self.run, self.i, self.active_model)
 			if terminated: print('Terminated!')
 		
-		reward = self.pn.rewards - old_rewards + evolution_penalty
+		reward = (self.pn.rewards - old_rewards)/(1+(self.pn.clock - old_clock))
 		
-		info = {}
+		info = {'pn_reward' : self.pn.rewards}
 		return observation, reward, terminated, info
 
 	def reset(self):
@@ -62,3 +58,7 @@ class AEPN_Env(Env):
 		valid_actions = [True if i in v_a else False for i in self.pn_actions]
 		self.valid_actions = valid_actions
 		return valid_actions
+
+
+    
+        

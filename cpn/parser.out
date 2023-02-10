@@ -3,66 +3,71 @@ Created by PLY version 3.11 (http://www.dabeaz.com/ply)
 Grammar
 
 Rule 0     S' -> petrinet
-Rule 1     petrinet -> PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
-Rule 2     places -> place COMMA places
-Rule 3     places -> place
-Rule 4     transitions -> transition COMMA transitions
-Rule 5     transitions -> transition
-Rule 6     arcs -> arc COMMA arcs
-Rule 7     arcs -> arc
-Rule 8     markings -> marking COMMA markings
-Rule 9     markings -> marking
-Rule 10    place -> LABEL LPAREN RPAREN
-Rule 11    transition -> LABEL LPAREN RPAREN
-Rule 12    transition -> LABEL LPAREN LABEL COMMA NUMBER RPAREN
-Rule 13    arc -> LPAREN LABEL COMMA LABEL RPAREN
-Rule 14    arc -> LPAREN LABEL COMMA LABEL COMMA LABEL RPAREN
-Rule 15    arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS NUMBER RPAREN
-Rule 16    arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA NUMBER COMMA NUMBER RPAREN
-Rule 17    arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN
-Rule 18    marking -> LPAREN LABEL COMMA tokens RPAREN
-Rule 19    tokens -> NUMBER EXPRESSION
-Rule 20    tokens -> NUMBER EXPRESSION PLUSPLUS tokens
+Rule 1     petrinet -> COLORTYPE EQUALS OPENSET colortype CLOSESET PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
+Rule 2     colortype -> type
+Rule 3     places -> place COMMA places
+Rule 4     places -> place
+Rule 5     transitions -> transition COMMA transitions
+Rule 6     transitions -> transition
+Rule 7     arcs -> arc COMMA arcs
+Rule 8     arcs -> arc
+Rule 9     markings -> marking COMMA markings
+Rule 10    markings -> marking
+Rule 11    type -> LABEL
+Rule 12    place -> LABEL LPAREN RPAREN
+Rule 13    transition -> LABEL LPAREN RPAREN
+Rule 14    transition -> LABEL LPAREN LABEL COMMA NUMBER RPAREN
+Rule 15    arc -> LPAREN LABEL COMMA LABEL RPAREN
+Rule 16    arc -> LPAREN LABEL COMMA LABEL COMMA LABEL RPAREN
+Rule 17    arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS NUMBER RPAREN
+Rule 18    arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA NUMBER COMMA NUMBER RPAREN
+Rule 19    arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN
+Rule 20    marking -> LPAREN LABEL COMMA tokens RPAREN
+Rule 21    tokens -> NUMBER EXPRESSION
+Rule 22    tokens -> NUMBER EXPRESSION PLUSPLUS tokens
 
 Terminals, with rules where they appear
 
 ARCS                 : 1
-CLOSESET             : 1 1 1 1
-COMMA                : 2 4 6 8 12 13 14 14 15 15 15 16 16 16 16 17 17 17 18
-EQUALS               : 1 1 1 1
-EXPRESSION           : 19 20
-LABEL                : 10 11 12 12 13 13 14 14 14 15 15 15 16 16 16 17 17 17 17 18
-LPAREN               : 10 11 12 13 14 15 16 17 17 18
+CLOSESET             : 1 1 1 1 1
+COLORTYPE            : 1
+COMMA                : 3 5 7 9 14 15 16 16 17 17 17 18 18 18 18 19 19 19 20
+EQUALS               : 1 1 1 1 1
+EXPRESSION           : 21 22
+LABEL                : 11 12 13 14 14 15 15 16 16 16 17 17 17 18 18 18 19 19 19 19 20
+LPAREN               : 12 13 14 15 16 17 18 19 19 20
 MARKINGS             : 1
-NUMBER               : 12 15 16 16 17 19 20
-OPENSET              : 1 1 1 1
+NUMBER               : 14 17 18 18 19 21 22
+OPENSET              : 1 1 1 1 1
 PLACES               : 1
-PLUSPLUS             : 15 17 20
-RPAREN               : 10 11 12 13 14 15 16 17 17 18
+PLUSPLUS             : 17 19 22
+RPAREN               : 12 13 14 15 16 17 18 19 19 20
 TRANSITIONS          : 1
 error                : 
 
 Nonterminals, with rules where they appear
 
-arc                  : 6 7
-arcs                 : 1 6
-marking              : 8 9
-markings             : 1 8
+arc                  : 7 8
+arcs                 : 1 7
+colortype            : 1
+marking              : 9 10
+markings             : 1 9
 petrinet             : 0
-place                : 2 3
-places               : 1 2
-tokens               : 18 20
-transition           : 4 5
-transitions          : 1 4
+place                : 3 4
+places               : 1 3
+tokens               : 20 22
+transition           : 5 6
+transitions          : 1 5
+type                 : 2
 
 Parsing method: LALR
 
 state 0
 
     (0) S' -> . petrinet
-    (1) petrinet -> . PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
+    (1) petrinet -> . COLORTYPE EQUALS OPENSET colortype CLOSESET PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
 
-    PLACES          shift and go to state 2
+    COLORTYPE       shift and go to state 2
 
     petrinet                       shift and go to state 1
 
@@ -74,612 +79,665 @@ state 1
 
 state 2
 
-    (1) petrinet -> PLACES . EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
+    (1) petrinet -> COLORTYPE . EQUALS OPENSET colortype CLOSESET PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
 
     EQUALS          shift and go to state 3
 
 
 state 3
 
-    (1) petrinet -> PLACES EQUALS . OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
+    (1) petrinet -> COLORTYPE EQUALS . OPENSET colortype CLOSESET PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
 
     OPENSET         shift and go to state 4
 
 
 state 4
 
-    (1) petrinet -> PLACES EQUALS OPENSET . places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
-    (2) places -> . place COMMA places
-    (3) places -> . place
-    (10) place -> . LABEL LPAREN RPAREN
+    (1) petrinet -> COLORTYPE EQUALS OPENSET . colortype CLOSESET PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
+    (2) colortype -> . type
+    (11) type -> . LABEL
 
     LABEL           shift and go to state 7
 
-    places                         shift and go to state 5
-    place                          shift and go to state 6
+    colortype                      shift and go to state 5
+    type                           shift and go to state 6
 
 state 5
 
-    (1) petrinet -> PLACES EQUALS OPENSET places . CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
+    (1) petrinet -> COLORTYPE EQUALS OPENSET colortype . CLOSESET PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
 
     CLOSESET        shift and go to state 8
 
 
 state 6
 
-    (2) places -> place . COMMA places
-    (3) places -> place .
+    (2) colortype -> type .
 
-    COMMA           shift and go to state 9
-    CLOSESET        reduce using rule 3 (places -> place .)
+    CLOSESET        reduce using rule 2 (colortype -> type .)
 
 
 state 7
 
-    (10) place -> LABEL . LPAREN RPAREN
+    (11) type -> LABEL .
 
-    LPAREN          shift and go to state 10
+    CLOSESET        reduce using rule 11 (type -> LABEL .)
 
 
 state 8
 
-    (1) petrinet -> PLACES EQUALS OPENSET places CLOSESET . TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
+    (1) petrinet -> COLORTYPE EQUALS OPENSET colortype CLOSESET . PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
 
-    TRANSITIONS     shift and go to state 11
+    PLACES          shift and go to state 9
 
 
 state 9
 
-    (2) places -> place COMMA . places
-    (2) places -> . place COMMA places
-    (3) places -> . place
-    (10) place -> . LABEL LPAREN RPAREN
+    (1) petrinet -> COLORTYPE EQUALS OPENSET colortype CLOSESET PLACES . EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
 
-    LABEL           shift and go to state 7
+    EQUALS          shift and go to state 10
 
-    place                          shift and go to state 6
-    places                         shift and go to state 12
 
 state 10
 
-    (10) place -> LABEL LPAREN . RPAREN
+    (1) petrinet -> COLORTYPE EQUALS OPENSET colortype CLOSESET PLACES EQUALS . OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
 
-    RPAREN          shift and go to state 13
+    OPENSET         shift and go to state 11
 
 
 state 11
 
-    (1) petrinet -> PLACES EQUALS OPENSET places CLOSESET TRANSITIONS . EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
+    (1) petrinet -> COLORTYPE EQUALS OPENSET colortype CLOSESET PLACES EQUALS OPENSET . places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
+    (3) places -> . place COMMA places
+    (4) places -> . place
+    (12) place -> . LABEL LPAREN RPAREN
 
-    EQUALS          shift and go to state 14
+    LABEL           shift and go to state 14
 
+    places                         shift and go to state 12
+    place                          shift and go to state 13
 
 state 12
 
-    (2) places -> place COMMA places .
+    (1) petrinet -> COLORTYPE EQUALS OPENSET colortype CLOSESET PLACES EQUALS OPENSET places . CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
 
-    CLOSESET        reduce using rule 2 (places -> place COMMA places .)
+    CLOSESET        shift and go to state 15
 
 
 state 13
 
-    (10) place -> LABEL LPAREN RPAREN .
+    (3) places -> place . COMMA places
+    (4) places -> place .
 
-    COMMA           reduce using rule 10 (place -> LABEL LPAREN RPAREN .)
-    CLOSESET        reduce using rule 10 (place -> LABEL LPAREN RPAREN .)
+    COMMA           shift and go to state 16
+    CLOSESET        reduce using rule 4 (places -> place .)
 
 
 state 14
 
-    (1) petrinet -> PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS . OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
+    (12) place -> LABEL . LPAREN RPAREN
 
-    OPENSET         shift and go to state 15
+    LPAREN          shift and go to state 17
 
 
 state 15
 
-    (1) petrinet -> PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET . transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
-    (4) transitions -> . transition COMMA transitions
-    (5) transitions -> . transition
-    (11) transition -> . LABEL LPAREN RPAREN
-    (12) transition -> . LABEL LPAREN LABEL COMMA NUMBER RPAREN
+    (1) petrinet -> COLORTYPE EQUALS OPENSET colortype CLOSESET PLACES EQUALS OPENSET places CLOSESET . TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
 
-    LABEL           shift and go to state 18
+    TRANSITIONS     shift and go to state 18
 
-    transitions                    shift and go to state 16
-    transition                     shift and go to state 17
 
 state 16
 
-    (1) petrinet -> PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions . CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
+    (3) places -> place COMMA . places
+    (3) places -> . place COMMA places
+    (4) places -> . place
+    (12) place -> . LABEL LPAREN RPAREN
 
-    CLOSESET        shift and go to state 19
+    LABEL           shift and go to state 14
 
+    place                          shift and go to state 13
+    places                         shift and go to state 19
 
 state 17
 
-    (4) transitions -> transition . COMMA transitions
-    (5) transitions -> transition .
+    (12) place -> LABEL LPAREN . RPAREN
 
-    COMMA           shift and go to state 20
-    CLOSESET        reduce using rule 5 (transitions -> transition .)
+    RPAREN          shift and go to state 20
 
 
 state 18
 
-    (11) transition -> LABEL . LPAREN RPAREN
-    (12) transition -> LABEL . LPAREN LABEL COMMA NUMBER RPAREN
+    (1) petrinet -> COLORTYPE EQUALS OPENSET colortype CLOSESET PLACES EQUALS OPENSET places CLOSESET TRANSITIONS . EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
 
-    LPAREN          shift and go to state 21
+    EQUALS          shift and go to state 21
 
 
 state 19
 
-    (1) petrinet -> PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET . ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
+    (3) places -> place COMMA places .
 
-    ARCS            shift and go to state 22
+    CLOSESET        reduce using rule 3 (places -> place COMMA places .)
 
 
 state 20
 
-    (4) transitions -> transition COMMA . transitions
-    (4) transitions -> . transition COMMA transitions
-    (5) transitions -> . transition
-    (11) transition -> . LABEL LPAREN RPAREN
-    (12) transition -> . LABEL LPAREN LABEL COMMA NUMBER RPAREN
+    (12) place -> LABEL LPAREN RPAREN .
 
-    LABEL           shift and go to state 18
+    COMMA           reduce using rule 12 (place -> LABEL LPAREN RPAREN .)
+    CLOSESET        reduce using rule 12 (place -> LABEL LPAREN RPAREN .)
 
-    transition                     shift and go to state 17
-    transitions                    shift and go to state 23
 
 state 21
 
-    (11) transition -> LABEL LPAREN . RPAREN
-    (12) transition -> LABEL LPAREN . LABEL COMMA NUMBER RPAREN
+    (1) petrinet -> COLORTYPE EQUALS OPENSET colortype CLOSESET PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS . OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
 
-    RPAREN          shift and go to state 25
-    LABEL           shift and go to state 24
+    OPENSET         shift and go to state 22
 
 
 state 22
 
-    (1) petrinet -> PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS . EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
+    (1) petrinet -> COLORTYPE EQUALS OPENSET colortype CLOSESET PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET . transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
+    (5) transitions -> . transition COMMA transitions
+    (6) transitions -> . transition
+    (13) transition -> . LABEL LPAREN RPAREN
+    (14) transition -> . LABEL LPAREN LABEL COMMA NUMBER RPAREN
 
-    EQUALS          shift and go to state 26
+    LABEL           shift and go to state 25
 
+    transitions                    shift and go to state 23
+    transition                     shift and go to state 24
 
 state 23
 
-    (4) transitions -> transition COMMA transitions .
+    (1) petrinet -> COLORTYPE EQUALS OPENSET colortype CLOSESET PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions . CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
 
-    CLOSESET        reduce using rule 4 (transitions -> transition COMMA transitions .)
+    CLOSESET        shift and go to state 26
 
 
 state 24
 
-    (12) transition -> LABEL LPAREN LABEL . COMMA NUMBER RPAREN
+    (5) transitions -> transition . COMMA transitions
+    (6) transitions -> transition .
 
     COMMA           shift and go to state 27
+    CLOSESET        reduce using rule 6 (transitions -> transition .)
 
 
 state 25
 
-    (11) transition -> LABEL LPAREN RPAREN .
+    (13) transition -> LABEL . LPAREN RPAREN
+    (14) transition -> LABEL . LPAREN LABEL COMMA NUMBER RPAREN
 
-    COMMA           reduce using rule 11 (transition -> LABEL LPAREN RPAREN .)
-    CLOSESET        reduce using rule 11 (transition -> LABEL LPAREN RPAREN .)
+    LPAREN          shift and go to state 28
 
 
 state 26
 
-    (1) petrinet -> PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS . OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
+    (1) petrinet -> COLORTYPE EQUALS OPENSET colortype CLOSESET PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET . ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
 
-    OPENSET         shift and go to state 28
+    ARCS            shift and go to state 29
 
 
 state 27
 
-    (12) transition -> LABEL LPAREN LABEL COMMA . NUMBER RPAREN
+    (5) transitions -> transition COMMA . transitions
+    (5) transitions -> . transition COMMA transitions
+    (6) transitions -> . transition
+    (13) transition -> . LABEL LPAREN RPAREN
+    (14) transition -> . LABEL LPAREN LABEL COMMA NUMBER RPAREN
 
-    NUMBER          shift and go to state 29
+    LABEL           shift and go to state 25
 
+    transition                     shift and go to state 24
+    transitions                    shift and go to state 30
 
 state 28
 
-    (1) petrinet -> PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET . arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
-    (6) arcs -> . arc COMMA arcs
-    (7) arcs -> . arc
-    (13) arc -> . LPAREN LABEL COMMA LABEL RPAREN
-    (14) arc -> . LPAREN LABEL COMMA LABEL COMMA LABEL RPAREN
-    (15) arc -> . LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS NUMBER RPAREN
-    (16) arc -> . LPAREN LABEL COMMA LABEL COMMA LABEL COMMA NUMBER COMMA NUMBER RPAREN
-    (17) arc -> . LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN
+    (13) transition -> LABEL LPAREN . RPAREN
+    (14) transition -> LABEL LPAREN . LABEL COMMA NUMBER RPAREN
 
-    LPAREN          shift and go to state 32
+    RPAREN          shift and go to state 32
+    LABEL           shift and go to state 31
 
-    arcs                           shift and go to state 30
-    arc                            shift and go to state 31
 
 state 29
 
-    (12) transition -> LABEL LPAREN LABEL COMMA NUMBER . RPAREN
+    (1) petrinet -> COLORTYPE EQUALS OPENSET colortype CLOSESET PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS . EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
 
-    RPAREN          shift and go to state 33
+    EQUALS          shift and go to state 33
 
 
 state 30
 
-    (1) petrinet -> PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs . CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
+    (5) transitions -> transition COMMA transitions .
 
-    CLOSESET        shift and go to state 34
+    CLOSESET        reduce using rule 5 (transitions -> transition COMMA transitions .)
 
 
 state 31
 
-    (6) arcs -> arc . COMMA arcs
-    (7) arcs -> arc .
+    (14) transition -> LABEL LPAREN LABEL . COMMA NUMBER RPAREN
 
-    COMMA           shift and go to state 35
-    CLOSESET        reduce using rule 7 (arcs -> arc .)
+    COMMA           shift and go to state 34
 
 
 state 32
 
-    (13) arc -> LPAREN . LABEL COMMA LABEL RPAREN
-    (14) arc -> LPAREN . LABEL COMMA LABEL COMMA LABEL RPAREN
-    (15) arc -> LPAREN . LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS NUMBER RPAREN
-    (16) arc -> LPAREN . LABEL COMMA LABEL COMMA LABEL COMMA NUMBER COMMA NUMBER RPAREN
-    (17) arc -> LPAREN . LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN
+    (13) transition -> LABEL LPAREN RPAREN .
 
-    LABEL           shift and go to state 36
+    COMMA           reduce using rule 13 (transition -> LABEL LPAREN RPAREN .)
+    CLOSESET        reduce using rule 13 (transition -> LABEL LPAREN RPAREN .)
 
 
 state 33
 
-    (12) transition -> LABEL LPAREN LABEL COMMA NUMBER RPAREN .
+    (1) petrinet -> COLORTYPE EQUALS OPENSET colortype CLOSESET PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS . OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
 
-    COMMA           reduce using rule 12 (transition -> LABEL LPAREN LABEL COMMA NUMBER RPAREN .)
-    CLOSESET        reduce using rule 12 (transition -> LABEL LPAREN LABEL COMMA NUMBER RPAREN .)
+    OPENSET         shift and go to state 35
 
 
 state 34
 
-    (1) petrinet -> PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET . MARKINGS EQUALS OPENSET markings CLOSESET
+    (14) transition -> LABEL LPAREN LABEL COMMA . NUMBER RPAREN
 
-    MARKINGS        shift and go to state 37
+    NUMBER          shift and go to state 36
 
 
 state 35
 
-    (6) arcs -> arc COMMA . arcs
-    (6) arcs -> . arc COMMA arcs
-    (7) arcs -> . arc
-    (13) arc -> . LPAREN LABEL COMMA LABEL RPAREN
-    (14) arc -> . LPAREN LABEL COMMA LABEL COMMA LABEL RPAREN
-    (15) arc -> . LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS NUMBER RPAREN
-    (16) arc -> . LPAREN LABEL COMMA LABEL COMMA LABEL COMMA NUMBER COMMA NUMBER RPAREN
-    (17) arc -> . LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN
+    (1) petrinet -> COLORTYPE EQUALS OPENSET colortype CLOSESET PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET . arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
+    (7) arcs -> . arc COMMA arcs
+    (8) arcs -> . arc
+    (15) arc -> . LPAREN LABEL COMMA LABEL RPAREN
+    (16) arc -> . LPAREN LABEL COMMA LABEL COMMA LABEL RPAREN
+    (17) arc -> . LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS NUMBER RPAREN
+    (18) arc -> . LPAREN LABEL COMMA LABEL COMMA LABEL COMMA NUMBER COMMA NUMBER RPAREN
+    (19) arc -> . LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN
 
-    LPAREN          shift and go to state 32
+    LPAREN          shift and go to state 39
 
-    arc                            shift and go to state 31
-    arcs                           shift and go to state 38
+    arcs                           shift and go to state 37
+    arc                            shift and go to state 38
 
 state 36
 
-    (13) arc -> LPAREN LABEL . COMMA LABEL RPAREN
-    (14) arc -> LPAREN LABEL . COMMA LABEL COMMA LABEL RPAREN
-    (15) arc -> LPAREN LABEL . COMMA LABEL COMMA LABEL COMMA PLUSPLUS NUMBER RPAREN
-    (16) arc -> LPAREN LABEL . COMMA LABEL COMMA LABEL COMMA NUMBER COMMA NUMBER RPAREN
-    (17) arc -> LPAREN LABEL . COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN
+    (14) transition -> LABEL LPAREN LABEL COMMA NUMBER . RPAREN
 
-    COMMA           shift and go to state 39
+    RPAREN          shift and go to state 40
 
 
 state 37
 
-    (1) petrinet -> PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS . EQUALS OPENSET markings CLOSESET
+    (1) petrinet -> COLORTYPE EQUALS OPENSET colortype CLOSESET PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs . CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET
 
-    EQUALS          shift and go to state 40
+    CLOSESET        shift and go to state 41
 
 
 state 38
 
-    (6) arcs -> arc COMMA arcs .
+    (7) arcs -> arc . COMMA arcs
+    (8) arcs -> arc .
 
-    CLOSESET        reduce using rule 6 (arcs -> arc COMMA arcs .)
+    COMMA           shift and go to state 42
+    CLOSESET        reduce using rule 8 (arcs -> arc .)
 
 
 state 39
 
-    (13) arc -> LPAREN LABEL COMMA . LABEL RPAREN
-    (14) arc -> LPAREN LABEL COMMA . LABEL COMMA LABEL RPAREN
-    (15) arc -> LPAREN LABEL COMMA . LABEL COMMA LABEL COMMA PLUSPLUS NUMBER RPAREN
-    (16) arc -> LPAREN LABEL COMMA . LABEL COMMA LABEL COMMA NUMBER COMMA NUMBER RPAREN
-    (17) arc -> LPAREN LABEL COMMA . LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN
+    (15) arc -> LPAREN . LABEL COMMA LABEL RPAREN
+    (16) arc -> LPAREN . LABEL COMMA LABEL COMMA LABEL RPAREN
+    (17) arc -> LPAREN . LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS NUMBER RPAREN
+    (18) arc -> LPAREN . LABEL COMMA LABEL COMMA LABEL COMMA NUMBER COMMA NUMBER RPAREN
+    (19) arc -> LPAREN . LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN
 
-    LABEL           shift and go to state 41
+    LABEL           shift and go to state 43
 
 
 state 40
 
-    (1) petrinet -> PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS . OPENSET markings CLOSESET
+    (14) transition -> LABEL LPAREN LABEL COMMA NUMBER RPAREN .
 
-    OPENSET         shift and go to state 42
+    COMMA           reduce using rule 14 (transition -> LABEL LPAREN LABEL COMMA NUMBER RPAREN .)
+    CLOSESET        reduce using rule 14 (transition -> LABEL LPAREN LABEL COMMA NUMBER RPAREN .)
 
 
 state 41
 
-    (13) arc -> LPAREN LABEL COMMA LABEL . RPAREN
-    (14) arc -> LPAREN LABEL COMMA LABEL . COMMA LABEL RPAREN
-    (15) arc -> LPAREN LABEL COMMA LABEL . COMMA LABEL COMMA PLUSPLUS NUMBER RPAREN
-    (16) arc -> LPAREN LABEL COMMA LABEL . COMMA LABEL COMMA NUMBER COMMA NUMBER RPAREN
-    (17) arc -> LPAREN LABEL COMMA LABEL . COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN
+    (1) petrinet -> COLORTYPE EQUALS OPENSET colortype CLOSESET PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET . MARKINGS EQUALS OPENSET markings CLOSESET
 
-    RPAREN          shift and go to state 44
-    COMMA           shift and go to state 43
+    MARKINGS        shift and go to state 44
 
 
 state 42
 
-    (1) petrinet -> PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET . markings CLOSESET
-    (8) markings -> . marking COMMA markings
-    (9) markings -> . marking
-    (18) marking -> . LPAREN LABEL COMMA tokens RPAREN
+    (7) arcs -> arc COMMA . arcs
+    (7) arcs -> . arc COMMA arcs
+    (8) arcs -> . arc
+    (15) arc -> . LPAREN LABEL COMMA LABEL RPAREN
+    (16) arc -> . LPAREN LABEL COMMA LABEL COMMA LABEL RPAREN
+    (17) arc -> . LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS NUMBER RPAREN
+    (18) arc -> . LPAREN LABEL COMMA LABEL COMMA LABEL COMMA NUMBER COMMA NUMBER RPAREN
+    (19) arc -> . LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN
 
-    LPAREN          shift and go to state 47
+    LPAREN          shift and go to state 39
 
-    markings                       shift and go to state 45
-    marking                        shift and go to state 46
+    arc                            shift and go to state 38
+    arcs                           shift and go to state 45
 
 state 43
 
-    (14) arc -> LPAREN LABEL COMMA LABEL COMMA . LABEL RPAREN
-    (15) arc -> LPAREN LABEL COMMA LABEL COMMA . LABEL COMMA PLUSPLUS NUMBER RPAREN
-    (16) arc -> LPAREN LABEL COMMA LABEL COMMA . LABEL COMMA NUMBER COMMA NUMBER RPAREN
-    (17) arc -> LPAREN LABEL COMMA LABEL COMMA . LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN
+    (15) arc -> LPAREN LABEL . COMMA LABEL RPAREN
+    (16) arc -> LPAREN LABEL . COMMA LABEL COMMA LABEL RPAREN
+    (17) arc -> LPAREN LABEL . COMMA LABEL COMMA LABEL COMMA PLUSPLUS NUMBER RPAREN
+    (18) arc -> LPAREN LABEL . COMMA LABEL COMMA LABEL COMMA NUMBER COMMA NUMBER RPAREN
+    (19) arc -> LPAREN LABEL . COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN
 
-    LABEL           shift and go to state 48
+    COMMA           shift and go to state 46
 
 
 state 44
 
-    (13) arc -> LPAREN LABEL COMMA LABEL RPAREN .
+    (1) petrinet -> COLORTYPE EQUALS OPENSET colortype CLOSESET PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS . EQUALS OPENSET markings CLOSESET
 
-    COMMA           reduce using rule 13 (arc -> LPAREN LABEL COMMA LABEL RPAREN .)
-    CLOSESET        reduce using rule 13 (arc -> LPAREN LABEL COMMA LABEL RPAREN .)
+    EQUALS          shift and go to state 47
 
 
 state 45
 
-    (1) petrinet -> PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings . CLOSESET
+    (7) arcs -> arc COMMA arcs .
 
-    CLOSESET        shift and go to state 49
+    CLOSESET        reduce using rule 7 (arcs -> arc COMMA arcs .)
 
 
 state 46
 
-    (8) markings -> marking . COMMA markings
-    (9) markings -> marking .
+    (15) arc -> LPAREN LABEL COMMA . LABEL RPAREN
+    (16) arc -> LPAREN LABEL COMMA . LABEL COMMA LABEL RPAREN
+    (17) arc -> LPAREN LABEL COMMA . LABEL COMMA LABEL COMMA PLUSPLUS NUMBER RPAREN
+    (18) arc -> LPAREN LABEL COMMA . LABEL COMMA LABEL COMMA NUMBER COMMA NUMBER RPAREN
+    (19) arc -> LPAREN LABEL COMMA . LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN
 
-    COMMA           shift and go to state 50
-    CLOSESET        reduce using rule 9 (markings -> marking .)
+    LABEL           shift and go to state 48
 
 
 state 47
 
-    (18) marking -> LPAREN . LABEL COMMA tokens RPAREN
+    (1) petrinet -> COLORTYPE EQUALS OPENSET colortype CLOSESET PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS . OPENSET markings CLOSESET
 
-    LABEL           shift and go to state 51
+    OPENSET         shift and go to state 49
 
 
 state 48
 
-    (14) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL . RPAREN
-    (15) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL . COMMA PLUSPLUS NUMBER RPAREN
-    (16) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL . COMMA NUMBER COMMA NUMBER RPAREN
-    (17) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL . COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN
+    (15) arc -> LPAREN LABEL COMMA LABEL . RPAREN
+    (16) arc -> LPAREN LABEL COMMA LABEL . COMMA LABEL RPAREN
+    (17) arc -> LPAREN LABEL COMMA LABEL . COMMA LABEL COMMA PLUSPLUS NUMBER RPAREN
+    (18) arc -> LPAREN LABEL COMMA LABEL . COMMA LABEL COMMA NUMBER COMMA NUMBER RPAREN
+    (19) arc -> LPAREN LABEL COMMA LABEL . COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN
 
-    RPAREN          shift and go to state 53
-    COMMA           shift and go to state 52
+    RPAREN          shift and go to state 51
+    COMMA           shift and go to state 50
 
 
 state 49
 
-    (1) petrinet -> PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET .
+    (1) petrinet -> COLORTYPE EQUALS OPENSET colortype CLOSESET PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET . markings CLOSESET
+    (9) markings -> . marking COMMA markings
+    (10) markings -> . marking
+    (20) marking -> . LPAREN LABEL COMMA tokens RPAREN
 
-    $end            reduce using rule 1 (petrinet -> PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET .)
+    LPAREN          shift and go to state 54
 
+    markings                       shift and go to state 52
+    marking                        shift and go to state 53
 
 state 50
 
-    (8) markings -> marking COMMA . markings
-    (8) markings -> . marking COMMA markings
-    (9) markings -> . marking
-    (18) marking -> . LPAREN LABEL COMMA tokens RPAREN
+    (16) arc -> LPAREN LABEL COMMA LABEL COMMA . LABEL RPAREN
+    (17) arc -> LPAREN LABEL COMMA LABEL COMMA . LABEL COMMA PLUSPLUS NUMBER RPAREN
+    (18) arc -> LPAREN LABEL COMMA LABEL COMMA . LABEL COMMA NUMBER COMMA NUMBER RPAREN
+    (19) arc -> LPAREN LABEL COMMA LABEL COMMA . LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN
 
-    LPAREN          shift and go to state 47
+    LABEL           shift and go to state 55
 
-    marking                        shift and go to state 46
-    markings                       shift and go to state 54
 
 state 51
 
-    (18) marking -> LPAREN LABEL . COMMA tokens RPAREN
+    (15) arc -> LPAREN LABEL COMMA LABEL RPAREN .
 
-    COMMA           shift and go to state 55
+    COMMA           reduce using rule 15 (arc -> LPAREN LABEL COMMA LABEL RPAREN .)
+    CLOSESET        reduce using rule 15 (arc -> LPAREN LABEL COMMA LABEL RPAREN .)
 
 
 state 52
 
-    (15) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA . PLUSPLUS NUMBER RPAREN
-    (16) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA . NUMBER COMMA NUMBER RPAREN
-    (17) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA . PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN
+    (1) petrinet -> COLORTYPE EQUALS OPENSET colortype CLOSESET PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings . CLOSESET
 
-    PLUSPLUS        shift and go to state 56
-    NUMBER          shift and go to state 57
+    CLOSESET        shift and go to state 56
 
 
 state 53
 
-    (14) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL RPAREN .
+    (9) markings -> marking . COMMA markings
+    (10) markings -> marking .
 
-    COMMA           reduce using rule 14 (arc -> LPAREN LABEL COMMA LABEL COMMA LABEL RPAREN .)
-    CLOSESET        reduce using rule 14 (arc -> LPAREN LABEL COMMA LABEL COMMA LABEL RPAREN .)
+    COMMA           shift and go to state 57
+    CLOSESET        reduce using rule 10 (markings -> marking .)
 
 
 state 54
 
-    (8) markings -> marking COMMA markings .
+    (20) marking -> LPAREN . LABEL COMMA tokens RPAREN
 
-    CLOSESET        reduce using rule 8 (markings -> marking COMMA markings .)
+    LABEL           shift and go to state 58
 
 
 state 55
 
-    (18) marking -> LPAREN LABEL COMMA . tokens RPAREN
-    (19) tokens -> . NUMBER EXPRESSION
-    (20) tokens -> . NUMBER EXPRESSION PLUSPLUS tokens
+    (16) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL . RPAREN
+    (17) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL . COMMA PLUSPLUS NUMBER RPAREN
+    (18) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL . COMMA NUMBER COMMA NUMBER RPAREN
+    (19) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL . COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN
 
-    NUMBER          shift and go to state 59
+    RPAREN          shift and go to state 60
+    COMMA           shift and go to state 59
 
-    tokens                         shift and go to state 58
 
 state 56
 
-    (15) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS . NUMBER RPAREN
-    (17) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS . LABEL LPAREN NUMBER RPAREN RPAREN
+    (1) petrinet -> COLORTYPE EQUALS OPENSET colortype CLOSESET PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET .
 
-    NUMBER          shift and go to state 61
-    LABEL           shift and go to state 60
+    $end            reduce using rule 1 (petrinet -> COLORTYPE EQUALS OPENSET colortype CLOSESET PLACES EQUALS OPENSET places CLOSESET TRANSITIONS EQUALS OPENSET transitions CLOSESET ARCS EQUALS OPENSET arcs CLOSESET MARKINGS EQUALS OPENSET markings CLOSESET .)
 
 
 state 57
 
-    (16) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA NUMBER . COMMA NUMBER RPAREN
+    (9) markings -> marking COMMA . markings
+    (9) markings -> . marking COMMA markings
+    (10) markings -> . marking
+    (20) marking -> . LPAREN LABEL COMMA tokens RPAREN
+
+    LPAREN          shift and go to state 54
+
+    marking                        shift and go to state 53
+    markings                       shift and go to state 61
+
+state 58
+
+    (20) marking -> LPAREN LABEL . COMMA tokens RPAREN
 
     COMMA           shift and go to state 62
 
 
-state 58
-
-    (18) marking -> LPAREN LABEL COMMA tokens . RPAREN
-
-    RPAREN          shift and go to state 63
-
-
 state 59
 
-    (19) tokens -> NUMBER . EXPRESSION
-    (20) tokens -> NUMBER . EXPRESSION PLUSPLUS tokens
+    (17) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA . PLUSPLUS NUMBER RPAREN
+    (18) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA . NUMBER COMMA NUMBER RPAREN
+    (19) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA . PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN
 
-    EXPRESSION      shift and go to state 64
+    PLUSPLUS        shift and go to state 63
+    NUMBER          shift and go to state 64
 
 
 state 60
 
-    (17) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL . LPAREN NUMBER RPAREN RPAREN
+    (16) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL RPAREN .
 
-    LPAREN          shift and go to state 65
+    COMMA           reduce using rule 16 (arc -> LPAREN LABEL COMMA LABEL COMMA LABEL RPAREN .)
+    CLOSESET        reduce using rule 16 (arc -> LPAREN LABEL COMMA LABEL COMMA LABEL RPAREN .)
 
 
 state 61
 
-    (15) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS NUMBER . RPAREN
+    (9) markings -> marking COMMA markings .
 
-    RPAREN          shift and go to state 66
+    CLOSESET        reduce using rule 9 (markings -> marking COMMA markings .)
 
 
 state 62
 
-    (16) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA NUMBER COMMA . NUMBER RPAREN
+    (20) marking -> LPAREN LABEL COMMA . tokens RPAREN
+    (21) tokens -> . NUMBER EXPRESSION
+    (22) tokens -> . NUMBER EXPRESSION PLUSPLUS tokens
 
-    NUMBER          shift and go to state 67
+    NUMBER          shift and go to state 66
 
+    tokens                         shift and go to state 65
 
 state 63
 
-    (18) marking -> LPAREN LABEL COMMA tokens RPAREN .
+    (17) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS . NUMBER RPAREN
+    (19) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS . LABEL LPAREN NUMBER RPAREN RPAREN
 
-    COMMA           reduce using rule 18 (marking -> LPAREN LABEL COMMA tokens RPAREN .)
-    CLOSESET        reduce using rule 18 (marking -> LPAREN LABEL COMMA tokens RPAREN .)
+    NUMBER          shift and go to state 68
+    LABEL           shift and go to state 67
 
 
 state 64
 
-    (19) tokens -> NUMBER EXPRESSION .
-    (20) tokens -> NUMBER EXPRESSION . PLUSPLUS tokens
+    (18) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA NUMBER . COMMA NUMBER RPAREN
 
-    RPAREN          reduce using rule 19 (tokens -> NUMBER EXPRESSION .)
-    PLUSPLUS        shift and go to state 68
+    COMMA           shift and go to state 69
 
 
 state 65
 
-    (17) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN . NUMBER RPAREN RPAREN
-
-    NUMBER          shift and go to state 69
-
-
-state 66
-
-    (15) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS NUMBER RPAREN .
-
-    COMMA           reduce using rule 15 (arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS NUMBER RPAREN .)
-    CLOSESET        reduce using rule 15 (arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS NUMBER RPAREN .)
-
-
-state 67
-
-    (16) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA NUMBER COMMA NUMBER . RPAREN
+    (20) marking -> LPAREN LABEL COMMA tokens . RPAREN
 
     RPAREN          shift and go to state 70
 
 
+state 66
+
+    (21) tokens -> NUMBER . EXPRESSION
+    (22) tokens -> NUMBER . EXPRESSION PLUSPLUS tokens
+
+    EXPRESSION      shift and go to state 71
+
+
+state 67
+
+    (19) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL . LPAREN NUMBER RPAREN RPAREN
+
+    LPAREN          shift and go to state 72
+
+
 state 68
 
-    (20) tokens -> NUMBER EXPRESSION PLUSPLUS . tokens
-    (19) tokens -> . NUMBER EXPRESSION
-    (20) tokens -> . NUMBER EXPRESSION PLUSPLUS tokens
-
-    NUMBER          shift and go to state 59
-
-    tokens                         shift and go to state 71
-
-state 69
-
-    (17) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER . RPAREN RPAREN
-
-    RPAREN          shift and go to state 72
-
-
-state 70
-
-    (16) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA NUMBER COMMA NUMBER RPAREN .
-
-    COMMA           reduce using rule 16 (arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA NUMBER COMMA NUMBER RPAREN .)
-    CLOSESET        reduce using rule 16 (arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA NUMBER COMMA NUMBER RPAREN .)
-
-
-state 71
-
-    (20) tokens -> NUMBER EXPRESSION PLUSPLUS tokens .
-
-    RPAREN          reduce using rule 20 (tokens -> NUMBER EXPRESSION PLUSPLUS tokens .)
-
-
-state 72
-
-    (17) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN . RPAREN
+    (17) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS NUMBER . RPAREN
 
     RPAREN          shift and go to state 73
 
 
+state 69
+
+    (18) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA NUMBER COMMA . NUMBER RPAREN
+
+    NUMBER          shift and go to state 74
+
+
+state 70
+
+    (20) marking -> LPAREN LABEL COMMA tokens RPAREN .
+
+    COMMA           reduce using rule 20 (marking -> LPAREN LABEL COMMA tokens RPAREN .)
+    CLOSESET        reduce using rule 20 (marking -> LPAREN LABEL COMMA tokens RPAREN .)
+
+
+state 71
+
+    (21) tokens -> NUMBER EXPRESSION .
+    (22) tokens -> NUMBER EXPRESSION . PLUSPLUS tokens
+
+    RPAREN          reduce using rule 21 (tokens -> NUMBER EXPRESSION .)
+    PLUSPLUS        shift and go to state 75
+
+
+state 72
+
+    (19) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN . NUMBER RPAREN RPAREN
+
+    NUMBER          shift and go to state 76
+
+
 state 73
 
-    (17) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN .
+    (17) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS NUMBER RPAREN .
 
-    COMMA           reduce using rule 17 (arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN .)
-    CLOSESET        reduce using rule 17 (arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN .)
+    COMMA           reduce using rule 17 (arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS NUMBER RPAREN .)
+    CLOSESET        reduce using rule 17 (arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS NUMBER RPAREN .)
+
+
+state 74
+
+    (18) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA NUMBER COMMA NUMBER . RPAREN
+
+    RPAREN          shift and go to state 77
+
+
+state 75
+
+    (22) tokens -> NUMBER EXPRESSION PLUSPLUS . tokens
+    (21) tokens -> . NUMBER EXPRESSION
+    (22) tokens -> . NUMBER EXPRESSION PLUSPLUS tokens
+
+    NUMBER          shift and go to state 66
+
+    tokens                         shift and go to state 78
+
+state 76
+
+    (19) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER . RPAREN RPAREN
+
+    RPAREN          shift and go to state 79
+
+
+state 77
+
+    (18) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA NUMBER COMMA NUMBER RPAREN .
+
+    COMMA           reduce using rule 18 (arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA NUMBER COMMA NUMBER RPAREN .)
+    CLOSESET        reduce using rule 18 (arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA NUMBER COMMA NUMBER RPAREN .)
+
+
+state 78
+
+    (22) tokens -> NUMBER EXPRESSION PLUSPLUS tokens .
+
+    RPAREN          reduce using rule 22 (tokens -> NUMBER EXPRESSION PLUSPLUS tokens .)
+
+
+state 79
+
+    (19) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN . RPAREN
+
+    RPAREN          shift and go to state 80
+
+
+state 80
+
+    (19) arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN .
+
+    COMMA           reduce using rule 19 (arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN .)
+    CLOSESET        reduce using rule 19 (arc -> LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN .)
 

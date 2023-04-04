@@ -1,0 +1,36 @@
+Places={
+arrival(`{'{"x":1,"y":1,"ttl":1}'}`),
+ready(`{'{"x":1,"y":1,"ttl":2}', '{"x":1,"y":1,"ttl":1}', '{"x":1,"y":1,"ttl":0}'}`),
+agents(`{'{"x":0,"y":0}','{"x":1,"y":0}','{"x":0,"y":1}','{"x":1,"y":1}'}`),
+positions(`{'{"x":0,"y":0}','{"x":1,"y":0}','{"x":0,"y":1}','{"x":1,"y":1}'}`)
+}
+
+Transitions={
+arrive(e, 0),
+pickup(a, 1, `check_zero_ttl(object, true_if_zero=False) and check_coordinates(agent, object)`),
+move(a, 0, `check_adjacency(agent, position)`),
+decrement_ttl(e, 0, `check_zero_ttl(object, true_if_zero=False)`),
+lose_order(e, 0, `check_zero_ttl(object, true_if_zero=True)`)
+}
+
+Arcs={
+(arrival, arrive, object),
+(arrive, arrival, object, ++1),
+(arrive, ready, object, ++1),
+(ready, decrement_ttl, object),
+(decrement_ttl, ready, `decrement_ttl(object)`, ++1),
+(ready, lose_order, object),
+(ready, pickup, object),
+(agents, pickup, agent),
+(pickup, agents, agent),
+(agents, move, agent),
+(positions, move, position),
+(move, positions, position),
+(move, agents, position, ++1)
+}
+
+Markings={
+(positions,1`{"x":0,"y":0}@0`++1`{"x":0,"y":1}@0`++1`{"x":1,"y":0}@0`++1`{"x":1,"y":1}@0`),
+(agents,1`{"x":0,"y":0}@1`),
+(arrival,1`{"x":1,"y":1,"ttl":1}@0`)
+}

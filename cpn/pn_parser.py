@@ -1,6 +1,6 @@
 import ply.lex as lex
 import ply.yacc as yacc
-from cpn_ast import PetriNetNode, PlaceNode, TransitionNode, ArcNode, MarkingNode, TokenNode, ColorTypeNode
+from .cpn_ast import PetriNetNode, PlaceNode, TransitionNode, ArcNode, MarkingNode, TokenNode, ColorTypeNode
 
 
 class PNLexer:
@@ -41,7 +41,7 @@ class PNLexer:
         return t
 
     def t_TEXT(self, t):
-        r'[;a-zA-Z][a-zA-Z0-9;]*' #DIRTY! the ; character is treated as text to allow markings of arbitrary size
+        r'[_;a-zA-Z][a-zA-Z0-9;_]*' #the ; character is treated as text to allow markings of arbitrary size, while _ is just textx
         if t.value in self.reserved:  # Check for reserved words
             t.type = self.reserved[t.value]
         else:
@@ -70,16 +70,11 @@ class PNParser:
     tokens = PNLexer.tokens
     
     def p_petrinet(self, p):
-        '''petrinet : COLORTYPE EQUALS OPENSET colortype CLOSESET\
-                      PLACES EQUALS OPENSET places CLOSESET\
+        '''petrinet : PLACES EQUALS OPENSET places CLOSESET\
                       TRANSITIONS EQUALS OPENSET transitions CLOSESET\
                       ARCS EQUALS OPENSET arcs CLOSESET\
                       MARKINGS EQUALS OPENSET markings CLOSESET'''
-        p[0] = PetriNetNode(p[4], p[9], p[14], p[19], p[24])
-
-    def p_color_type(self, p):
-        '''colortype : type'''
-        p[0] = [p[1]]
+        p[0] = PetriNetNode(p[4], p[9], p[14], p[19])
 
     def p_places(self, p):
         '''places : place COMMA places
@@ -106,23 +101,33 @@ class PNParser:
         p[0] = ColorTypeNode(p[1])
 
     def p_place(self, p):
-        '''place : LABEL LPAREN RPAREN'''
-        p[0] = PlaceNode(p[1], "")
+        '''place : LABEL LPAREN RPAREN
+                 | LABEL LPAREN EXPRESSION RPAREN'''
+        if len(p) == 4:
+            p[0] = PlaceNode(p[1], "{}")
+        elif len(p) == 5:
+            p[0] = PlaceNode(p[1], p[3])
 
     def p_transition(self, p):
         '''transition : LABEL LPAREN RPAREN
-                      | LABEL LPAREN LABEL COMMA NUMBER RPAREN'''
+                      | LABEL LPAREN LABEL COMMA NUMBER RPAREN
+                      | LABEL LPAREN LABEL COMMA EXPRESSION RPAREN
+                      | LABEL LPAREN LABEL COMMA NUMBER COMMA EXPRESSION RPAREN '''
         if len(p) == 4:
             p[0] = TransitionNode(p[1])
-        elif len(p) == 7:
+        elif len(p) == 7: #numeric reward or function reward
             p[0] = TransitionNode(p[1], p[3], p[5])
+        elif len(p) == 9:
+            p[0] = TransitionNode(p[1], p[3], p[5], p[7])
         else:
             raise Exception(f"Invalid transition token")
 
     def p_arc(self, p):
         '''arc : LPAREN LABEL COMMA LABEL RPAREN
                | LPAREN LABEL COMMA LABEL COMMA LABEL RPAREN
+               | LPAREN LABEL COMMA LABEL COMMA EXPRESSION RPAREN
                | LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS NUMBER RPAREN
+               | LPAREN LABEL COMMA LABEL COMMA EXPRESSION COMMA PLUSPLUS NUMBER RPAREN
                | LPAREN LABEL COMMA LABEL COMMA LABEL COMMA NUMBER COMMA NUMBER RPAREN
                | LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN
                | LPAREN LABEL COMMA LABEL COMMA LABEL LPAREN EXPRESSION RPAREN COMMA PLUSPLUS NUMBER RPAREN
@@ -133,8 +138,6 @@ class PNParser:
             p[0] = ArcNode(p[2], p[4], p[6])
         elif len(p) == 11: #fixed delay labelled time increasing arc (outgoing from transition)
             p[0] = ArcNode(p[2], p[4], p[6], increment=p[9])
-        elif len(p) == 12: #labelled time windowed arc (incoming in transition) NOT REALLY NEEDED
-            p[0] = ArcNode(p[2], p[4], p[6], tw_low=p[8], tw_high=p[10])
         elif len(p) == 14 and type(p[11]) == int: #variable delay labelled time increasing arc (outgoing from transition)
             p[0] = ArcNode(p[2], p[4], p[6], delay_type=p[9], delay_params=p[11])
         elif len(p) == 14: #fixed delay time increasing arc (outgoing from transition) labelled with arc function

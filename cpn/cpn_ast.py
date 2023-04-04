@@ -1,6 +1,6 @@
 import json
-from petrinet import AEPetriNet, PetriNet
-from pncomponents import Place, Transition, TaggedTransition
+from .petrinet import AEPetriNet, PetriNet
+from .pncomponents import Place, Transition, TaggedTransition
 
 class ASTNode:
     def visit(self, visitor):
@@ -16,8 +16,7 @@ class ExpNode(ASTNode):
 
 
 class PetriNetNode(ASTNode):
-    def __init__(self, color_type, places, transitions, arcs, marking):
-        self.color_type = color_type
+    def __init__(self, places, transitions, arcs, marking):
         self.places = places
         self.transitions = transitions
         self.arcs = arcs
@@ -39,34 +38,28 @@ class PetriNetNode(ASTNode):
             result += str(m) + "\n"
         return result
 
-class ColorTypeNode(ASTNode):
-    def __init__(self, label):
-        self.label = label
-
-    def __str__(self):
-        return self.p_id
-
 class PlaceNode(ASTNode):
-    def __init__(self, p_id, label):
+    def __init__(self, p_id, colors_set):
         self.p_id = p_id
-        self.label = label
+        self.colors_set = sorted(eval(colors_set))
 
     def __str__(self):
         return self.p_id
 
 
 class TransitionNode(ASTNode):
-    def __init__(self, t_id, tag=None, reward=None):
+    def __init__(self, t_id, tag=None, reward=None, guard=None):
         self.t_id = t_id
         self.tag = tag
-        self.reward= reward
+        self.reward = reward
+        self.guard = guard
 
     def __str__(self):
         return self.t_id
 
 
-class ArcNode(ASTNode):
-    def __init__(self, src_id, dst_id, variable=None, function=None, function_params=None, tw_low=None, tw_high=None, increment=None, delay_type=None, delay_params=None):
+class ArcNode(ASTNode): #TODO: remove unnecessary parameters and reintroduce variable increments
+    def __init__(self, src_id, dst_id, variable=None, increment=0, function=None, function_params=None, tw_low=None, tw_high=None, delay_type=None, delay_params=None):
         self.src_id = src_id
         self.dst_id = dst_id
         self.variable = variable
@@ -104,32 +97,36 @@ class MarkingNode(ASTNode):
         result += ")"
         return result
 
-#TODO: composite colors in initial markings are not considered
-class TokenNode(ASTNode):
+class TokenNode(ASTNode): #rewrite to include time in a standardized way
     def __init__(self, count, values):
         self.count = count
-        values = values.split(';')
-        self.color = [values]
+        #self.color = values
+        try:
+            self.color, self.time = values.split('@')
+            self.time = int(self.time)
+        except:
+            print("Warning: no time was provided for tokens, falling back to time=0")
+            self.color = values
+            self.time = 0
+
 
     def __str__(self):
-        return str(self.count) + "`" + self.color + "`"
+        return str(self.count) + "`" + self.color + "`" 
 
 class ColorTypeNode(ASTNode):
     def __init__(self, type):
         self.type = type
 
 class PetriNetCreatorVisitor:
-    def __init__(self, net_type="PetriNet"):
+    def __init__(self, net_type = "PetriNet", additional_functions = None):
         if net_type == "PetriNet":
-            self.pn = PetriNet()
+            self.pn = PetriNet(additional_functions)
         elif net_type == "AEPetriNet":
-            self.pn = AEPetriNet()
+            self.pn = AEPetriNet(additional_functions)
         else:
             raise Exception("Invalid net type")
 
     def accept(self, element):
-        if type(element).__name__ == "ColorTypeNode":
-            self.pn.set_color_type(type)
         if type(element).__name__ == "PetriNetNode":
             for place_node in element.places:
                 place_node.visit(self)
@@ -140,24 +137,26 @@ class PetriNetCreatorVisitor:
             for marking_node in element.marking:
                 marking_node.visit(self)
         elif type(element).__name__ == "PlaceNode":
-            self.pn.add_place(Place(element.p_id))
+            self.pn.add_place(Place(element.p_id, colors_set=element.colors_set))
         elif type(element).__name__ == "TransitionNode":
             if element.tag is None:
-                self.pn.add_transition(Transition(element.t_id))
+                self.pn.add_transition(Transition(element.t_id, element.tag, element.reward, element.guard))
             else:
-                self.pn.add_transition(TaggedTransition(element.t_id, element.tag, element.reward))
+                self.pn.add_transition(TaggedTransition(element.t_id, element.tag, element.reward, element.guard))
 
         elif type(element).__name__ == "ArcNode":
-            self.pn.add_arc_by_ids(element.src_id, element.dst_id, element.variable, element.function, element.function_params, element.tw, element.increment, element.delay_type, element.delay_params)
+            self.pn.add_arc_by_ids(element.src_id, element.dst_id, inscription=element.variable, time_expression=element.increment)
         elif type(element).__name__ == "MarkingNode":
-            tokens = dict()
             for token_node in element.tokens:
-                (value, count) = token_node.visit(self)
-                tokens[value] = count
-            self.pn.add_mark_by_id(element.p_id, tokens)
+                (value, time, count) = token_node.visit(self)
+                for i in range(count):
+                    #import pdb
+                    #pdb.set_trace()
+                    self.pn.add_mark_by_id(element.p_id, value, time)
         elif type(element).__name__ == "TokenNode":
-            return element.color, element.count
+            return element.color, element.time, element.count
 
     def create(self, petrinet_node):
         petrinet_node.visit(self)
+        self.pn.sort_attributes()
         return self.pn

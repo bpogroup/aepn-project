@@ -1,0 +1,27 @@
+Places={
+arrival(`{'{"weight":2}', '{"weight":1}'}`),
+ready(`{'{"weight":2}', '{"weight":1}'}`),
+bins(`{'{"curr_level":0,"capacity":3}', '{"curr_level":1,"capacity":3}', '{"curr_level":2,"capacity":3}', '{"curr_level":3,"capacity":3}', '{"curr_level":0,"capacity":2}', '{"curr_level":1,"capacity":2}', '{"curr_level":2,"capacity":2}'}`)
+}
+
+Transitions={
+arrive(e, 0),
+assign(a, 0, `check_remaining_space(object, bin)`),
+empty(e, `percent_full(bin)`)
+}
+
+Arcs={
+(arrival, arrive, x),
+(arrive, arrival, x, ++1),
+(arrive, ready, x, ++1),
+(ready, assign, object),
+(bins, assign, bin),
+(assign, bins, `assign_obj_to_bin(object, bin)`),
+(bins, empty, bin),
+(empty, bins, `empty(bin)`, ++1)
+}
+
+Markings={
+(bins,1`{"curr_level":0,"capacity":3}@1`++1`{"curr_level":0,"capacity":2}@1`),
+(arrival,2`{"weight":2}@0`++1`{"weight":2}@0`)
+}

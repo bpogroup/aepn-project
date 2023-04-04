@@ -1,0 +1,28 @@
+Places={
+arrival(`{"a", "b"}`),
+waiting(`{"a", "b"}`),
+busy(`{"a", "b"}`),
+resources(`{"a", "b"}`)
+}
+
+Transitions={
+arrive(e, 0),
+start(a, 0),
+complete(e, 1)
+}
+
+Arcs={
+(arrival, arrive, a),
+(arrive, arrival, a, ++1),
+(arrive, waiting, a),
+(waiting, start, x),
+(resources, start, x),
+(start, busy, x, ++1),
+(busy, complete, x),
+(complete, resources, x)
+}
+
+Markings={
+(resources,1`a@0`++1`b@0`),
+(arrival,1`a@0`++1`b@0`)
+}

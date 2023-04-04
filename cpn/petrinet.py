@@ -1,18 +1,17 @@
 import random
 import json
 import itertools
-from time import time_ns
-from tkinter import SEL
-import uuid
 from abc import ABC, abstractclassmethod
-from pncomponents import Transition, TaggedTransition, Place, Token, Arc, TimedToken, AssociativeColor, CapacityColor
 import os
-from gym_env import aepn_env
 import logging
 from sb3_contrib import MaskablePPO
 from sb3_contrib.common.maskable.policies import MaskableActorCriticPolicy
-from color_functions import *
+from stable_baselines3.common.logger import configure
 import copy
+import time
+from .gym_env import aepn_env
+from .pncomponents import Transition, TaggedTransition, Place, Token, Arc
+from .color_functions import *
 
 class AbstractPetriNet(ABC):
     @abstractclassmethod
@@ -126,7 +125,7 @@ class PetriNet(AbstractPetriNet):
                 n.connect_arc(arc)
                 break
 
-    def add_arc_by_ids(self, src, dst, inscription=None, time_expression=None):
+    def add_arc_by_ids(self, src, dst, inscription, time_expression=0):
         if src not in self.by_id:
             raise Exception("Cannot find node with id '" + src + "' to construct arc to '" + dst + "'.")
         if dst not in self.by_id:
@@ -144,7 +143,7 @@ class PetriNet(AbstractPetriNet):
             raise Exception("Attempting to mark a non-existing place.")
         place.add_token(token)
 
-    def add_mark_by_id(self, place_id, token):
+    def add_mark_by_id(self, place_id, color, time=0):
         """
         Marks a place with a token. The place is identified by its identifier.
         Each token has a value (can also be None to indicate a black token).
@@ -155,7 +154,7 @@ class PetriNet(AbstractPetriNet):
 
         if place_id not in self.by_id:
             raise Exception("Cannot find place with id '" + place_id + "' to mark.")
-        self.add_mark(self.by_id[place_id], token)
+        self.add_mark(self.by_id[place_id], Token(color, time))
         
     def tokens_combinations(self, transition):
         # create all possible combinations of incoming token values
@@ -204,6 +203,8 @@ class PetriNet(AbstractPetriNet):
                         break
                 variable_values[arc.inscription] = token.color
                 if time is None or token.time > time:
+                    #import pdb
+                    #pdb.set_trace()
                     time = token.time
             if enabled and transition.guard is not None:  # if the transition has a guard, that guard must evaluate to True with the given variable binding
                 exec(compile(self.additional_functions + "result = " + transition.guard, "<string>", "exec"), variable_values)
@@ -297,6 +298,11 @@ class AEPetriNet(PetriNet):
 
         self.colors_set = None #if colors sets are not defined on single places, only initial colors are used for bulding observations
     
+    def sort_attributes(self):
+        self.places.sort(key=lambda p: p._id)
+        self.transitions.sort(key=lambda t: t._id)
+        self.arcs.sort(key=lambda t: t._id)
+
     def bindings(self):
         """
         Calculates the set of timed bindings that is enabled in the net.
@@ -326,7 +332,7 @@ class AEPetriNet(PetriNet):
         if (len(timed_bindings_curr) > 0 and timed_bindings_curr[0][1] <= self.clock):
             pass
         elif (len(timed_bindings_curr) > 0 and timed_bindings_curr[0][1] > self.clock):
-            if timed_bindings_other[0][1] <= timed_bindings_curr[0][1]:
+            if (timed_bindings_other[0][1] <= timed_bindings_curr[0][1]) and len(timed_bindings_other) > 0:
                 self.switch_tag()
                 self.clock = timed_bindings_other[0][1]
                 print(f"Tag switched to {self.tag} at time {self.clock}")
@@ -344,6 +350,57 @@ class AEPetriNet(PetriNet):
         # now return the untimed bindings + the timed bindings that have time <= clock
         bindings = untimed_bindings + [(binding, time) for (binding, time) in timed_bindings_curr if time <= self.clock]
         return bindings, active_model
+
+    def fire(self, timed_binding):
+        """
+        Fires the specified timed binding.
+        Binding is a tuple ([(arc, token), (arc, token), ...], time)
+        """
+        (binding, time) = timed_binding
+        # process incoming places:
+        transition = None
+        variable_assignment = dict()
+        for (arc, token) in binding:
+            transition = arc.dst
+            # remove tokens from incoming places
+            arc.src.remove_token(token)
+            # assign values to the variables on the arcs
+            if arc.inscription is not None:
+                variable_assignment[arc.inscription] = token.color
+
+        # process outgoing places:
+        for arc in transition.outgoing:
+            # add tokens on outgoing places
+            token = Token(None)
+            if arc.inscription is not None:  # if the arc has an inscription
+                exec(compile(self.additional_functions + "result = " + arc.inscription, "<string>", "exec"), variable_assignment)
+                token.color = variable_assignment['result']
+            if arc.time_expression is not None:  # if the transition has a time expression
+                exec(compile(self.additional_functions + "result = " + str(arc.time_expression), "<string>", "exec"), variable_assignment)
+                token.time = self.clock + variable_assignment['result']
+            arc.dst.add_token(token)
+
+        self.update_reward(timed_binding)
+
+        print(f"Fired transition with binding {binding}")
+
+    def update_reward(self, timed_binding):
+        (binding, time) = timed_binding
+        transition = binding[0][0].dst #transition is always the same
+        if transition.reward != None:
+            if type(transition.reward) == int or type(transition.reward) == float:
+               self.rewards += transition.reward
+            elif type(transition.reward) == str: #rewards can be awarded on the base of a reward function
+                
+                # process incoming places:
+                variable_assignment = dict()
+                for (arc, token) in binding:
+                    # assign values to the variables on the arcs
+                    if arc.inscription is not None:
+                        variable_assignment[arc.inscription] = token.color
+                exec(compile(self.additional_functions + "result = " + transition.reward, "<string>", "exec"), variable_assignment)
+                self.rewards += variable_assignment['result']
+
 
     def switch_tag(self):
         if self.tag == 'a':
@@ -428,10 +485,12 @@ class AEPetriNet(PetriNet):
                         exec(compile(self.additional_functions + "result = " + t.guard, "<string>", "exec"), variable_values)
                         enabled = variable_values['result']
                         if enabled: color_associations.append(v_v_original)
-                     else: color_associations.append(**variable_values)
+                     else:
+                        color_associations.append(variable_values)
             
-
-            return color_associations #WARNING: not sorted
+            color_associations_strings = sorted([json.dumps(a) for a in color_associations]) #sort alphabetically to ensure the same positions in subsequent runs
+            color_associations = [json.loads(a) for a in color_associations_strings]
+            return color_associations
 
     def get_valid_actions(self):
         """
@@ -479,7 +538,7 @@ class AEPetriNet(PetriNet):
             for u_b in unt_binding:
                 dict_res[u_b[0].inscription] = u_b[1].color
             inscr_color_bindings.append(dict_res)
-
+            
         return inscr_color_bindings
 
     def apply_action(self, action):
@@ -497,29 +556,13 @@ class AEPetriNet(PetriNet):
             prev_tag = self.tag
             binding = random.choice(action_bindings)
             self.fire(binding)
-            self.update_reward(binding)
             self.bindings() #used to update the clock if necessary
             return self.get_observation(), 1
         else:
             raise Exception("The chosen action seems to be unavailable! No action will be performed.")
 
 
-    def update_reward(self, timed_binding):
-        (binding, time) = timed_binding
-        transition = binding[0][0].dst #transition is always the same
-        if transition.reward != None:
-            if type(transition.reward) == int or type(transition.reward) == float:
-               self.rewards += transition.reward
-            elif type(transition.reward) == str: #rewards can be awarded on the base of a reward function
-                
-                # process incoming places:
-                variable_assignment = dict()
-                for (arc, token) in binding:
-                    # assign values to the variables on the arcs
-                    if arc.inscription is not None:
-                        variable_assignment[arc.inscription] = token.color
-                exec(compile(self.additional_functions + "result = " + transition.reward, "<string>", "exec"), variable_assignment)
-                self.rewards += variable_assignment['result']
+
 
 
     def simulation_run(self, length):
@@ -527,43 +570,49 @@ class AEPetriNet(PetriNet):
         i = 0
         active_model = True
         prev_tag = self.tag
-        while self.clock <= length and active_model:
+        while self.clock < length and active_model:
             bindings, active_model = self.bindings()
             if len(bindings) > 0:
                 binding = random.choice(bindings)
                 run.append(binding)
                 self.fire(binding)
-                self.update_reward(binding)
                 print(binding)
                 i += 1
 
         print(f"Total reward random over {length} steps: {self.rewards} \n")
         return run, self.rewards
 
-    def training_run(self, num_episodes, episode_length, load_model, out_model_name="model.pt", out_folder_name = './out'):
+    def training_run(self, num_steps, episode_length, load_model, out_model_name="model.pt", out_folder_name = './out'):
         """
         Runs the petri net as a reinforcement learning environment
         """
         self.length = episode_length
 
         env = aepn_env.AEPN_Env(self)
+
+        out_path = os.path.join(out_folder_name, out_model_name)
+         #Logging to tensorboard. To access tensorboard, open a bash terminal in the projects directory, activate the environment (where tensorflow should be installed) and run the command in the following line
+        # tensorboard --logdir ./tmp/
+        # then, in a browser page, access localhost:6006 to see the board
+        log_dir = os.path.join(out_folder_name, 'log')
+
         if not os.path.exists(out_folder_name):
             os.makedirs(out_folder_name)
+            os.makedirs(log_dir)
             
-        out_path = os.path.join('out', out_model_name)
+        if load_model:
+            model = MaskablePPO.load(out_path, env, n_steps = 50)
+        else:
+            model = MaskablePPO(MaskableActorCriticPolicy, env, n_steps = 50, verbose=1)
         
-        for i in range(num_episodes):
-            if load_model:
-                model = MaskablePPO.load(out_path, env, n_steps = 50)
-            else:
-                model = MaskablePPO(MaskableActorCriticPolicy, env, n_steps = 50, verbose=1)
-
-            model.learn(total_timesteps=int(episode_length))
-            env.reset()
+        model.set_logger(configure(log_dir, ["stdout", "csv", "tensorboard"]))
+        model.learn(total_timesteps=num_steps)
+        env.reset()
+        model.save(out_path)
 
         print("Training over")
 
-        model.save(out_path)
+        
 
 
     def testing_run(self, length, additional_functions = None, out_model_name="model.pt", out_folder_name = './out'):
@@ -606,7 +655,6 @@ class AEPetriNet(PetriNet):
                 binding = random.choice(bindings)
                 run.append(binding)
                 self.fire(binding)
-                self.update_reward(binding)
                 print(binding)
                 i += 1
             elif len(bindings) > 0 and self.tag == 'a': #give control to the gym env by returning the current observation
@@ -616,12 +664,16 @@ class AEPetriNet(PetriNet):
 
         return self.get_observation(), self.clock > self.length or not active_model, i
 
+
+
+
+
 if __name__ == "__main__":
     test_cpn = False #test standard cpn implementation
     
-    test_task_assignment = False #test a-e cpn for task assignment problem
+    test_task_assignment = True #test a-e cpn for task assignment problem
     test_bin_packing = False #test a-e cpn for bin packing problem
-    test_vrp = True #test a-e cpn for production line problem (simplified routing)
+    test_vrp = False #test a-e cpn for production line problem (simplified routing)
     
     test_simulation = False
     test_training = True
@@ -662,6 +714,7 @@ if __name__ == "__main__":
         pn.add_mark_by_id("resources", Token("r1", 0))
         pn.add_mark_by_id("resources", Token("r1;r2", 0))
         pn.add_mark_by_id("arrival", Token("r1", 0))
+        pn.add_mark_by_id("arrival", Token("r2", 0))
 
         print(pn)
         print()
@@ -677,17 +730,17 @@ if __name__ == "__main__":
         my_functions = temp 
         pn = AEPetriNet(my_functions)
 
-        pn.add_place(Place("arrival"))#, colors_set={"r1", "r2"}))
-        pn.add_place(Place("waiting"))#, colors_set={"r1", "r2"}))
-        pn.add_place(Place("resources"))#, colors_set={"r1", "r1;r2"}))
-        pn.add_place(Place("busy"))#, colors_set={"r1|r1", "r1|r1;r2", "r2|r1;r2"}))
+        pn.add_place(Place("arrival", colors_set={"r1", "r2"}))
+        pn.add_place(Place("waiting", colors_set={"r1", "r2"}))
+        pn.add_place(Place("resources", colors_set={"r1", "r1;r2"}))
+        pn.add_place(Place("busy", colors_set={"r1|r1", "r1|r1;r2", "r2|r1;r2"}))
 
         pn.add_transition(TaggedTransition("arrive", tag='e', reward=0))
-        pn.add_transition(TaggedTransition("start", guard="check_compatibility(case, resource)", tag='a', reward=1))
-        pn.add_transition(TaggedTransition("complete", tag='e', reward=0))
+        pn.add_transition(TaggedTransition("start", guard="check_compatibility(case, resource)", tag='a', reward=0))
+        pn.add_transition(TaggedTransition("complete", tag='e', reward=1))
 
         pn.add_arc_by_ids("arrival", "arrive", "x")
-        pn.add_arc_by_ids("arrive", "arrival", "f(x)", time_expression=1)
+        pn.add_arc_by_ids("arrive", "arrival", "x", time_expression=1)
         pn.add_arc_by_ids("arrive", "waiting", "x", time_expression=0)
         pn.add_arc_by_ids("waiting", "start", "case")
         pn.add_arc_by_ids("resources", "start", "resource")
@@ -695,13 +748,10 @@ if __name__ == "__main__":
         pn.add_arc_by_ids("busy", "complete", "case_resource")
         pn.add_arc_by_ids("complete", "resources", "split(case_resource, 1)", time_expression=0)
 
-        pn.add_mark_by_id("resources", Token("r1", 0))
-        pn.add_mark_by_id("resources", Token("r1;r2", 0))
-        pn.add_mark_by_id("arrival", Token("r1", 0))
-        pn.add_mark_by_id("arrival", Token("r2", 0))
-
-        print(pn)
-        print()
+        pn.add_mark_by_id("resources", "r1", 0)
+        pn.add_mark_by_id("resources", "r1;r2", 0)
+        pn.add_mark_by_id("arrival", "r1", 0)
+        pn.add_mark_by_id("arrival", "r2", 0)
 
     elif test_bin_packing:
         f = open('./cpn/color_functions.py', 'r') #read functions file as txt
@@ -727,18 +777,11 @@ if __name__ == "__main__":
         pn.add_arc_by_ids("bins", "empty", "bin")
         pn.add_arc_by_ids("empty", "bins", "empty(bin)", time_expression=1)
 
-        pn.add_mark_by_id("bins", Token('{"curr_level":0,"capacity":3}', 1))
-        pn.add_mark_by_id("bins", Token('{"curr_level":0,"capacity":2}', 1))
-        pn.add_mark_by_id("arrival", Token('{"weight":2}', 0)) #objects are represented the same way as bins, but the only value considered is the capacity
-        pn.add_mark_by_id("arrival", Token('{"weight":2}', 0))
-        pn.add_mark_by_id("arrival", Token('{"weight":1}', 0))
-
-        print(pn)
-        
-        if test_simulation:
-            test_run = pn.simulation_run(10)
-            for test_binding in test_run:
-                print(test_binding)
+        pn.add_mark_by_id("bins", '{"curr_level":0,"capacity":3}', 1)
+        pn.add_mark_by_id("bins", '{"curr_level":0,"capacity":2}', 1)
+        pn.add_mark_by_id("arrival", '{"weight":2}', 0)
+        pn.add_mark_by_id("arrival", '{"weight":2}', 0)
+        pn.add_mark_by_id("arrival", '{"weight":1}', 0)
 
     elif test_vrp:
         f = open('./cpn/color_functions.py', 'r') #read functions file as txt
@@ -772,15 +815,16 @@ if __name__ == "__main__":
         pn.add_arc_by_ids("move", "positions", "position", time_expression=0)
         pn.add_arc_by_ids("move", "agents", "position", time_expression=1)
 
-        pn.add_mark_by_id("positions", Token('{"x":0,"y":0}', 0))
-        pn.add_mark_by_id("positions", Token('{"x":0,"y":1}', 0))
-        pn.add_mark_by_id("positions", Token('{"x":1,"y":0}', 0))
-        pn.add_mark_by_id("positions", Token('{"x":1,"y":1}', 0))
-        pn.add_mark_by_id("agents", Token('{"x":0,"y":0}', 1))
-        pn.add_mark_by_id("arrival", Token('{"x":1,"y":1,"ttl":2}', 0))
+        pn.add_mark_by_id("positions", '{"x":0,"y":0}', 0)
+        pn.add_mark_by_id("positions", '{"x":0,"y":1}', 0)
+        pn.add_mark_by_id("positions", '{"x":1,"y":0}', 0)
+        pn.add_mark_by_id("positions", '{"x":1,"y":1}', 0)
+        pn.add_mark_by_id("agents", '{"x":0,"y":0}', 1)
+        pn.add_mark_by_id("arrival", '{"x":1,"y":1,"ttl":1}', 0)
 
-        print(pn)
-
+    #make sure the observations are always in the same order
+    pn.sort_attributes()
+    print(pn)
 
     if test_simulation:
         test_run = pn.simulation_run(1000)
@@ -788,16 +832,25 @@ if __name__ == "__main__":
             print(test_binding)
 
     elif test_training:
-        test_run = pn.training_run(1, 10000, False)
+        start_time = time.time()
+        test_run = pn.training_run(100000, 100, False)
+        print("TRAINING TIME: --- %s seconds ---" % (time.time() - start_time))
 
     elif test_inference:
-        
-        rand_pn = copy.deepcopy(pn)
 
         length = 100
-
-        total_reward_ppo = pn.testing_run(length, additional_functions = my_functions)
-
-        run, total_reward_random = rand_pn.simulation_run(length)
         
-        print(f" Total reward PPO: {total_reward_ppo}\n Total reward random: {total_reward_random}")
+        repetitions = 1000
+
+        r_vec_ppo = []
+        r_vec_random = []
+        for i in range(repetitions):
+            pn = copy.copy(pn)
+            rand_pn = copy.deepcopy(pn)
+
+            total_reward_ppo = pn.testing_run(length, additional_functions = my_functions)
+            r_vec_ppo.append(total_reward_ppo)
+            run, total_reward_random = rand_pn.simulation_run(length)
+            r_vec_random.append(total_reward_random)
+        import numpy as np
+        print(f"Average reward PPO: {np.mean(r_vec_ppo)} with standard deviation {np.std(r_vec_ppo)}\nAverage reward random: {np.mean(r_vec_random)} with standard deviation {np.std(r_vec_random)}")

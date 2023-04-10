@@ -1,0 +1,28 @@
+Places={
+arrival(`{'a', 'b'}`),
+waiting(`{'a', 'b'}`),
+resources(`{'{"a":1,"b":2}', '{"a":2,"b":1}'}`),
+busy(`{'{"a":1,"b":2}|a', '{"a":1,"b":2}|b', '{"a":2,"b":1}|a', '{"a":2,"b":1}|b'}`)
+}
+
+Transitions={
+arrive(e, 0),
+start(a, 0),
+complete(e, 1)
+}
+
+Arcs={
+(arrival, arrive, x),
+(arrive, arrival, x, ++1),
+(arrive, waiting, x),
+(waiting, start, task),
+(resources, start, res),
+(start, busy, `combine(task, res)`, ++`soft_compatibility(task, res)`),
+(busy, complete, tr),
+(complete, resources, `split(tr, 1)`)
+}
+
+Markings={
+(resources,1`{"a":1,"b":2}@0`++1`{"a":2,"b":1}@0`),
+(arrival,1`a@0`++1`b@0`)
+}

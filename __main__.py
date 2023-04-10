@@ -17,7 +17,7 @@ def main(args):
     pn_ast = PNParser().parse(mynet_txt)
 
     #parse additional_functions
-    f = open(os.path.join('cpn', 'color_functions.py'), 'r') #read functions file as txt
+    f = open(os.path.join('cpn', 'gym_env', 'additional_functions', 'color_functions.py'), 'r') #read functions file as txt
     my_functions = f.read()
     f.close()
 
@@ -36,7 +36,7 @@ def main(args):
 
     if train_ae_pn:
         # Test run on A-E Petri net:
-        run = pn.training_run(100000, 100, load_ppo)
+        run = pn.training_run(100000, 100, load_ppo, out_model_name=f"model_{args.filename}.pt")
     
     if test_ae_pn:
         r_vec_ppo = []
@@ -45,7 +45,7 @@ def main(args):
             pn = copy.copy(pn)
             rand_pn = copy.deepcopy(pn)
 
-            total_reward_ppo = pn.testing_run(episode_length, additional_functions = my_functions)
+            total_reward_ppo = pn.testing_run(episode_length, additional_functions = my_functions, out_model_name=f"model_{args.filename}.pt")
             r_vec_ppo.append(total_reward_ppo)
             run, total_reward_random = rand_pn.simulation_run(episode_length)
             r_vec_random.append(total_reward_random)

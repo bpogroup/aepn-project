@@ -126,21 +126,24 @@ class PNParser:
         '''arc : LPAREN LABEL COMMA LABEL RPAREN
                | LPAREN LABEL COMMA LABEL COMMA LABEL RPAREN
                | LPAREN LABEL COMMA LABEL COMMA EXPRESSION RPAREN
-               | LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS NUMBER RPAREN
+               | LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS NUMBER RPAREN          
                | LPAREN LABEL COMMA LABEL COMMA EXPRESSION COMMA PLUSPLUS NUMBER RPAREN
-               | LPAREN LABEL COMMA LABEL COMMA LABEL COMMA NUMBER COMMA NUMBER RPAREN
-               | LPAREN LABEL COMMA LABEL COMMA LABEL COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN
+               | LPAREN LABEL COMMA LABEL COMMA EXPRESSION COMMA PLUSPLUS EXPRESSION RPAREN
                | LPAREN LABEL COMMA LABEL COMMA LABEL LPAREN EXPRESSION RPAREN COMMA PLUSPLUS NUMBER RPAREN
                | LPAREN LABEL COMMA LABEL COMMA LABEL LPAREN EXPRESSION RPAREN COMMA PLUSPLUS LABEL LPAREN NUMBER RPAREN RPAREN'''
         if len(p) == 6: #unlabeled arc
             p[0] = ArcNode(p[2], p[4])
         elif len(p) == 8: #labeled arc
+            #import pdb
+            #pdb.set_trace()
             p[0] = ArcNode(p[2], p[4], p[6])
-        elif len(p) == 11: #fixed delay labelled time increasing arc (outgoing from transition)
+        elif len(p) == 11: #fixed delay labelled time increasing arc (outgoing from transition): functions as time increase are handled internally (if a string is passed as p[9], it is assumed that such function is provided)
             p[0] = ArcNode(p[2], p[4], p[6], increment=p[9])
-        elif len(p) == 14 and type(p[11]) == int: #variable delay labelled time increasing arc (outgoing from transition)
-            p[0] = ArcNode(p[2], p[4], p[6], delay_type=p[9], delay_params=p[11])
+        #elif len(p) == 14 and type(p[11]) == int: #variable delay labelled time increasing arc (outgoing from transition)
+        #    p[0] = ArcNode(p[2], p[4], p[6], delay_type=p[9], delay_params=p[11])
         elif len(p) == 14: #fixed delay time increasing arc (outgoing from transition) labelled with arc function
+            import pdb
+            pdb.set_trace()
             p[0] = ArcNode(p[2], p[4], function = p[6], function_params = p[8], increment=p[12])
         elif len(p) == 17: #variable delay time increasing arc (outgoing from transition) labelled with arc function
             p[0] = ArcNode(p[2], p[4], function = p[6], function_params = p[8], delay_type=p[11], delay_params=p[14])

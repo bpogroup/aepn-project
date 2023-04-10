@@ -100,12 +100,11 @@ class MarkingNode(ASTNode):
 class TokenNode(ASTNode): #rewrite to include time in a standardized way
     def __init__(self, count, values):
         self.count = count
-        #self.color = values
         try:
             self.color, self.time = values.split('@')
             self.time = int(self.time)
         except:
-            print("Warning: no time was provided for tokens, falling back to time=0")
+            print("Warning: no time was provided for initial tokens, falling back to time=0")
             self.color = values
             self.time = 0
 
@@ -150,8 +149,6 @@ class PetriNetCreatorVisitor:
             for token_node in element.tokens:
                 (value, time, count) = token_node.visit(self)
                 for i in range(count):
-                    #import pdb
-                    #pdb.set_trace()
                     self.pn.add_mark_by_id(element.p_id, value, time)
         elif type(element).__name__ == "TokenNode":
             return element.color, element.time, element.count

@@ -4,6 +4,7 @@ import copy
 from numpy.random import default_rng
 import json
 import uuid
+from .gym_env.additional_functions.time_functions import *
 
 
 class AbstractNode(ABC):
@@ -141,14 +142,22 @@ class TimeIncreasingArc(Arc):
         self.rng = default_rng()
 
     def increment_time(self, token, clock):
-        if self.increment != None: #fixed increment
+        if self.increment == None:
+            raise Exception(f"No increment was provided on arc {self}")
+        elif type(self.increment) == int: #integer increment
             token.time = clock + self.increment
-        else: #random variable used as increment (currently, only geometric)
-            if self.delay_type == 'geometric' and isinstance(self.params, int) and 0 <= self.params <= 100:
-                token.time = clock + self.rng.geometric(float(self.params)/100)
-                print(f"Updated token clock to value {token.time}")
-            else:
-                raise Exception("The specified delay distribution is not supported, or an error was made in the parameters' definition")
+        elif type(self.increment) == str: #if a string is provided, it is assumed that it corresponds to an extra function defined in my_functions.py
+            increment = 0
+            f = open('./cpn/color_functions.py', 'r')
+            additional_functions = f.read()
+            f.close()
+            exec(compile(additional_functions + "result = " + self.increment, "<string>", "exec"), increment)
+            token.time = clock + increment
+        #elif type(self.increment) == int: #random variable used as increment (currently, only geometric)
+        #    if self.delay_type == 'geometric' and isinstance(self.params, int) and 0 <= self.params <= 100:
+        #        token.time = clock + self.rng.geometric(float(self.params)/100)
+        #        print(f"Updated token clock to value {token.time}")
+
 
 class Token:
     def __init__(self, color, time=None):

@@ -11,7 +11,7 @@ import copy
 import time
 from .gym_env import aepn_env
 from .pncomponents import Transition, TaggedTransition, Place, Token, Arc
-from .color_functions import *
+from .gym_env.additional_functions.color_functions import *
 
 class AbstractPetriNet(ABC):
     @abstractclassmethod
@@ -328,15 +328,18 @@ class AEPetriNet(PetriNet):
         timed_bindings_curr.sort(key=lambda b: b[1])
         timed_bindings_other.sort(key=lambda b: b[1])
 
-        #then check if the tag has to be updated
+        #then check if the tag has to be updated (TODO: simplify this condition)
         if (len(timed_bindings_curr) > 0 and timed_bindings_curr[0][1] <= self.clock):
             pass
         elif (len(timed_bindings_curr) > 0 and timed_bindings_curr[0][1] > self.clock):
-            if (timed_bindings_other[0][1] <= timed_bindings_curr[0][1]) and len(timed_bindings_other) > 0:
-                self.switch_tag()
-                self.clock = timed_bindings_other[0][1]
-                print(f"Tag switched to {self.tag} at time {self.clock}")
-                timed_bindings_curr = timed_bindings_other
+            if len(timed_bindings_other) > 0:
+                if (timed_bindings_other[0][1] <= timed_bindings_curr[0][1]):
+                    self.switch_tag()
+                    self.clock = timed_bindings_other[0][1]
+                    print(f"Tag switched to {self.tag} at time {self.clock}")
+                    timed_bindings_curr = timed_bindings_other
+                else:
+                    self.clock = timed_bindings_curr[0][1]
             else:
                 self.clock = timed_bindings_curr[0][1]
         elif len(timed_bindings_curr) == 0 and len(timed_bindings_other) != 0:

@@ -1,4 +1,5 @@
 import json
+import numpy as np
 
 def check_compatibility(c1, c2):
     c1 = c1.split(';')
@@ -83,7 +84,7 @@ def check_coordinates(agent, object):
     Check if the coordinated of agent are the same as those of object
     """
     agent_dict = json.loads(agent)
-    object_dict = json.loads(object)
+    object_dict = json.loads(object) 
     return agent_dict['x'] == object_dict['x'] and agent_dict['y'] == object_dict['y'] 
 
 def decrement_ttl(object):
@@ -95,3 +96,41 @@ def decrement_ttl(object):
     object_dict['ttl'] -= 1
 
     return json.dumps(object_dict).replace(" ", "")
+
+def soft_compatibility(task, res):
+    """
+    Defines token's delay according to a soft compatibility rule (see colors in task_assignment_soft_comp.txt)
+    """
+    res_dict = json.loads(res) 
+    return res_dict[task]
+
+def check_leaving(dummy_res):
+    """
+    Checks if the dummy resource is leaving (or returning)
+    """
+    dummy_res_dict = json.loads(dummy_res)
+    return dummy_res_dict['leaving']
+
+def set_random_leaving(dummy_res):
+    """
+    At each step, there is a 50% pobability that the resource will leave (or return)
+    """
+    is_leaving = np.random.randint(2)
+    if is_leaving:
+        dummy_res = switch_boolean(dummy_res)
+    return dummy_res
+
+def switch_boolean(dummy_res):
+    """
+    Switches the dummy resource's boolean value
+    """
+    dummy_res_dict = json.loads(dummy_res)
+    dummy_res_dict['leaving'] = int(not dummy_res_dict['leaving'])
+    return json.dumps(dummy_res_dict).replace(" ", "")
+
+def get_res(dummy_res):
+    """
+    Returns the dummy resource
+    """
+    dummy_res_dict = json.loads(dummy_res)
+    return dummy_res_dict['res']

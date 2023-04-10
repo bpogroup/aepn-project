@@ -1,0 +1,45 @@
+Places={
+arrival(`{"r1", "r2"}`),
+waiting(`{"r1", "r2"}`),
+resources(`{"r1", "r1;r2"}`),
+busy(`{"r1|r1", "r1|r1;r2", "r2|r1;r2"}`),
+dummy_resources(`{'{"res": "r1", "leaving": 0}', '{"res": "r1", "leaving": 1}', '{"res": "r1;r2", "leaving": 0}', '{"res": "r1;r2", "leaving": 1}'}`),
+away_resources(`{'{"res": "r1", "leaving": 0}', '{"res": "r1", "leaving": 1}', '{"res": "r1;r2", "leaving": 0}', '{"res": "r1;r2", "leaving": 1}'}`)
+}
+
+Transitions={
+arrive(e, 0),
+start(a, 0, `check_compatibility(task, res)`),
+complete(e, 1),
+leave(e, 0, `check_leaving(dummy_res)`),
+is_leaving(e, 0),
+return(e, 0, `check_leaving(dummy_res)`),
+is_returning(e, 0)
+}
+
+Arcs={
+(arrival, arrive, x),
+(arrive, arrival, x, ++1),
+(arrive, waiting, x),
+(waiting, start, task),
+(resources, start, res),
+(start, busy, `combine(task, res)`, ++1),
+(busy, complete, tr),
+(complete, resources, `split(tr, 1)`),
+(dummy_resources, is_leaving, dummy_res),
+(is_leaving, dummy_resources, `set_random_leaving(dummy_res)`, ++1),
+(resources, leave, res),
+(dummy_resources, leave, dummy_res),
+(leave, away_resources, `switch_boolean(dummy_res)`, ++1),
+(away_resources, is_returning, dummy_res),
+(is_returning, away_resources, `set_random_leaving(dummy_res)`, ++1),
+(away_resources, return, dummy_res),
+(return, resources, `get_res(dummy_res)`),
+(return, dummy_resources, `switch_boolean(dummy_res)`, ++1)
+}
+
+Markings={
+(resources,1`r1;r2@0`++1`r1@0`),
+(arrival,1`r1@0`++1`r2@0`),
+(dummy_resources,1`{"res": "r1", "leaving": 0}@0`++1`{"res": "r1;r2", "leaving": 0}@0`)
+}

@@ -45,3 +45,4 @@ A set of assignment problems with different characteristics were modeled in A-E 
 + **Task Assignment Problem with Soft Compatibilities (_task\_assignment\_soft\_comp.txt_)**
 + **Dynamic Bin Packing Problem (_bin\_packing.txt_)**
 + **Order Picking Problem (_order\_picking.txt_)**
++ **Task Assignment Problem with Leaving Resources (_task\_assignment\_leaving\_resources.txt_)**

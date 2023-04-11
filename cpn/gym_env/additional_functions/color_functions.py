@@ -134,3 +134,29 @@ def get_res(dummy_res):
     """
     dummy_res_dict = json.loads(dummy_res)
     return dummy_res_dict['res']
+
+def check_rew(task):
+    """
+    Returns the reward of the task
+    """
+    task_dict = json.loads(task)
+    return task_dict['rew']
+
+def decrement_n_res(task):
+    """
+    Decrements the number of resources required for the task
+    """
+    task_dict = json.loads(task)
+    task_dict['n_res'] -= 1
+    return json.dumps(task_dict).replace(" ", "")
+
+def check_n_res(task, true_if_zero=True):
+    """
+    Checks if the task is completed
+    """
+    object_dict = json.loads(task)
+    if object_dict['n_res'] == 0:
+        return true_if_zero
+    else:
+        return not true_if_zero
+

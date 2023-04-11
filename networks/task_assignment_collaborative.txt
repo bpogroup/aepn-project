@@ -1,0 +1,32 @@
+Places={
+arrival(`{'{"n_res":2,"ttl":1,"rew":3}','{"n_res":1,"ttl":1,"rew":1}'}`),
+ready(`{'{"n_res":2,"ttl":1,"rew":3}','{"n_res":2,"ttl":0,"rew":3}','{"n_res":1,"ttl":1,"rew":3}','{"n_res":1,"ttl":0,"rew":3}','{"n_res":0,"ttl":1,"rew":3}','{"n_res":0,"ttl":0,"rew":3}','{"n_res":1,"ttl":1,"rew":1}','{"n_res":1,"ttl":0,"rew":1}','{"n_res":0,"ttl":0,"rew":1}'}`),
+resources(`{'r'}`)
+}
+
+Transitions={
+arrive(e, 0),
+assign(a, 0, `check_n_res(task, true_if_zero=False)`),
+decrement_ttl(e, 0, `check_zero_ttl(task, true_if_zero=False)`),
+lose(e, 0, `check_zero_ttl(task, true_if_zero=True)`),
+complete(e, `check_rew(task)`, `check_zero_ttl(task, true_if_zero=False) and check_n_res(task, true_if_zero=True)`)
+}
+
+Arcs={
+(arrival, arrive, x),
+(arrive, arrival, x, ++1),
+(arrive, ready, x),
+(ready, decrement_ttl, task),
+(decrement_ttl, ready, `decrement_ttl(task)`),
+(ready, assign, task),
+(assign, ready, `decrement_n_res(task)`),
+(resources, assign, res),
+(assign, resources, res, ++1),
+(ready, complete, task),
+(ready, lose, task)
+}
+
+Markings={
+(arrival,1`{"n_res":2,"ttl":1,"rew":3}@0`++2`{"n_res":1,"ttl":1,"rew":1}@0`),
+(resources,2`r@0`)
+}

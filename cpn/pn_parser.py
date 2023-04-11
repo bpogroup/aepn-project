@@ -112,12 +112,13 @@ class PNParser:
         '''transition : LABEL LPAREN RPAREN
                       | LABEL LPAREN LABEL COMMA NUMBER RPAREN
                       | LABEL LPAREN LABEL COMMA EXPRESSION RPAREN
-                      | LABEL LPAREN LABEL COMMA NUMBER COMMA EXPRESSION RPAREN '''
+                      | LABEL LPAREN LABEL COMMA NUMBER COMMA EXPRESSION RPAREN
+                      | LABEL LPAREN LABEL COMMA EXPRESSION COMMA EXPRESSION RPAREN'''
         if len(p) == 4:
             p[0] = TransitionNode(p[1])
         elif len(p) == 7: #numeric reward or function reward
             p[0] = TransitionNode(p[1], p[3], p[5])
-        elif len(p) == 9:
+        elif len(p) == 9: #reward and guard function
             p[0] = TransitionNode(p[1], p[3], p[5], p[7])
         else:
             raise Exception(f"Invalid transition token")

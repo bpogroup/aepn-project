@@ -46,3 +46,4 @@ A set of assignment problems with different characteristics were modeled in A-E 
 + **Dynamic Bin Packing Problem (_bin\_packing.txt_)**
 + **Order Picking Problem (_order\_picking.txt_)**
 + **Task Assignment Problem with Leaving Resources (_task\_assignment\_leaving\_resources.txt_)**
++ **Collaborative Task Assignment Problem (_task\_assignment\_collaborative.txt_)**

@@ -47,3 +47,6 @@ A set of assignment problems with different characteristics were modeled in A-E 
 + **Order Picking Problem (_order\_picking.txt_)**
 + **Task Assignment Problem with Leaving Resources (_task\_assignment\_leaving\_resources.txt_)**
 + **Collaborative Task Assignment Problem (_task\_assignment\_collaborative.txt_)**
+
+## Remarks
+The color-specific functions used as guards for firing transitions and as reward functions are currently collected in `additional_functions.py`. In a future release, they will be included in the problem definitions.

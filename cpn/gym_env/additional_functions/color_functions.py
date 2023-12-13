@@ -116,7 +116,7 @@ def set_random_leaving(dummy_res):
     At each step, there is a 50% pobability that the resource will leave (or return)
     """
     is_leaving = np.random.randint(2)
-    if is_leaving:
+    if bool(is_leaving):
         dummy_res = switch_boolean(dummy_res)
     return dummy_res
 
@@ -125,7 +125,7 @@ def switch_boolean(dummy_res):
     Switches the dummy resource's boolean value
     """
     dummy_res_dict = json.loads(dummy_res)
-    dummy_res_dict['leaving'] = int(not dummy_res_dict['leaving'])
+    dummy_res_dict['leaving'] = int(not bool(dummy_res_dict['leaving']))
     return json.dumps(dummy_res_dict).replace(" ", "")
 
 def get_res(dummy_res):

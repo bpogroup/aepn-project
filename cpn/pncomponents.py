@@ -4,7 +4,10 @@ import copy
 from numpy.random import default_rng
 import json
 import uuid
-from .gym_env.additional_functions.time_functions import *
+try:
+    from .gym_env.additional_functions.time_functions import *
+except:
+    from gym_env.additional_functions.time_functions import *
 
 
 class AbstractNode(ABC):
@@ -65,7 +68,7 @@ class Node(AbstractNode):
 
 
 class Place(Node):
-    def __init__(self, _id, marking = dict(), colors_set = None):
+    def __init__(self, _id, marking = dict(), colors_set = None, tokens_attributes = None):
         """
         A place has an identifier _id and a marking.
         The marking is represented as a dictionary token -> number of tokens (with that color and time).
@@ -74,6 +77,7 @@ class Place(Node):
         super().__init__(_id)
         self.marking = copy.deepcopy(marking)
         self.colors_set = copy.deepcopy(colors_set)
+        self.tokens_attributes = copy.deepcopy(tokens_attributes)
 
     def add_token(self, token, count=1):
         if token not in self.marking:
@@ -158,7 +162,6 @@ class TimeIncreasingArc(Arc):
         #        token.time = clock + self.rng.geometric(float(self.params)/100)
         #        print(f"Updated token clock to value {token.time}")
 
-
 class Token:
     def __init__(self, color, time=None):
         self.color = color
@@ -181,3 +184,15 @@ class Token:
 
     def __repr__(self):
         return self.__str__()
+
+
+class Color(AbstractColor):
+    def __init__(self, id):
+        self.id = id
+
+    def __str__(self):
+        return self.id
+
+    def __repr__(self):
+        return self.__str__()
+    

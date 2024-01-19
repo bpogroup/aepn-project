@@ -695,7 +695,7 @@ if __name__ == "__main__":
         return test
 
     '''
-        f = open('./cpn/color_functions.py', 'r')
+        f = open('./gym_env/additional_functions/color_functions.py', 'r')
         temp = f.read()
         f.close()
         my_functions = temp 
@@ -732,7 +732,7 @@ if __name__ == "__main__":
             print(test_binding)
             
     elif test_task_assignment:
-        f = open('./cpn/color_functions.py', 'r')
+        f = open('./gym_env/additional_functions/color_functions.py', 'r')
         temp = f.read()
         f.close()
         my_functions = temp 

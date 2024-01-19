@@ -12,17 +12,15 @@ import os
 
 import torch
 from torch_geometric.utils import scatter
-from torch_geometric.nn import GCNConv, GATConv, to_hetero, HANConv
+from torch_geometric.nn import GATConv
 from torch_geometric.utils import softmax as pyg_softmax
 from torch.nn.functional import softmax
 
-from cpn.gym_env.new_aepn_env import AEPN_Env
 from graph.dynamic.graph_deletion_env import GraphDeletionEnv
 
-from graph.dynamic.pg import PGAgent, PPOAgent
+from pg import PGAgent, PPOAgent
 
-import torch.nn.functional as F
-import torch.nn as nn
+
 train = True
 
 def make_parser():
@@ -32,13 +30,39 @@ def make_parser():
 
     env = parser.add_argument_group('environment', 'environment type')
     env.add_argument('--environment',
-                     choices=['GraphDeletionEnv', 'ActionEvolutionPetriNetEnv'],
-                     default='ActionEvolutionPetriNetEnv',
+                     choices=['GraphDeletionEnv'],
+                     default='GraphDeletionEnv',
                      help='training environment')
     env.add_argument('--env_seed',
                      type=lambda x: int(x) if x.lower() != 'none' else None,
                      default=None,
                      help='seed for the environment')
+    env.add_argument('--alpha_dataset_size',
+                    type=int,
+                    default=1000,
+                    help='If using the AlphabetEnvironment then set dataset size')
+
+    ideal = parser.add_argument_group('ideals', 'ideal distribution and environment options')
+    ideal.add_argument('--distribution',
+                       type=str,
+                       default='3-20-10-weighted',
+                       help='random ideal distribution')
+    ideal.add_argument('--elimination',
+                       choices=['gebauermoeller', 'lcm', 'none'],
+                       default='gebauermoeller',
+                       help='pair elimination strategy')
+    ideal.add_argument('--rewards',
+                       choices=['additions', 'reductions'],
+                       default='additions',
+                       help='reward given for each step')
+    ideal.add_argument('--k',
+                       type=int,
+                       default=2,
+                       help='number of lead monomials visible')
+    ideal.add_argument('--use_cython',
+                       type=lambda x: str(x).lower() == 'true',
+                       default=True,
+                       help='whether to use the Cython environment')
 
     alg = parser.add_argument_group('algorithm', 'algorithm parameters')
     alg.add_argument('--algorithm',
@@ -93,11 +117,7 @@ def make_parser():
                         help='KL divergence limit used for early stopping')
     policy.add_argument('--policy_weights',
                         type=str,
-                        default="",#"policy-500.h5",
-                        help='filename for initial policy weights')
-    policy.add_argument('--policy_network',
-                        type=str,
-                        default="policy-500.pth",#"",
+                        default="",#"policy-1600.h5",
                         help='filename for initial policy weights')
     policy.add_argument('--score',
                         type = lambda x: str(x).lower() == 'true',
@@ -133,15 +153,15 @@ def make_parser():
     train = parser.add_argument_group('training')
     train.add_argument('--episodes',
                        type=int,
-                       default=10, #100
+                       default=100,
                        help='number of episodes per epoch')
     train.add_argument('--epochs',
                        type=int,
-                       default=500, #2500
+                       default=2500,
                        help='number of epochs')
     train.add_argument('--max_episode_length',
                        type=lambda x: int(x) if x.lower() != 'none' else None,
-                       default=100, #500
+                       default=500,
                        help='max number of interactions per episode')
     train.add_argument('--batch_size',
                        type=lambda x: int(x) if x.lower() != 'none' else None,
@@ -217,106 +237,6 @@ class Actor(ActorCritic):
             x = pyg_softmax(x, index)
         return x
 
-
-
-
-
-class HeteroActor(ActorCritic):
-    def __init__(self, output_size, metadata):
-        super(HeteroActor, self).__init__()
-        self.conv1 = HANConv(-1, 16, heads=1, metadata=metadata)  # 2 attention heads
-        self.conv2 = HANConv(16, output_size, metadata=metadata)  # we multiply by 2 due to the 2 attention heads
-
-    def forward(self, data):
-        if 'graph' in data.keys():
-            #x, metadata = data['graph'], data['graph'].metadata()
-            x = data['graph']
-        else:
-            x = data#data['x']
-            #metadata = data['x'].metadata
-            index = data['transition']['batch']
-            #index=data['transition'].batch
-
-        x_dict = x.x_dict
-        edge_index_dict = x.edge_index_dict
-
-        #import pdb; pdb.set_trace()
-        x_dict = self.conv1(x_dict, edge_index_dict)#, edge_index).relu()
-        x_dict = {k: F.relu(v) for k, v in x_dict.items() if v is not None}
-        x_dict = self.conv2(x_dict, edge_index_dict)#, edge_index)
-        if 'graph' in data.keys():
-            if 'mask' in data.keys():
-                mask = data['mask']['transition'].x
-                mask = mask.masked_fill(mask == 0, float('-inf'))
-                mask = mask.masked_fill(mask == 1, 0)
-                #mask brings the values to -inf if the action is not valid
-
-                #import pdb; pdb.set_trace()
-                #x_dict's transition node is brought to -inf if the action is not valid
-                x_dict['transition'] = x_dict['transition'] + mask
-
-            #x_dict = {k: softmax(v, dim=0) for k, v in x_dict.items() if v is not None}
-            x_dict = softmax(x_dict['transition'], dim=0)
-        else:
-            #x_dict = {k: pyg_softmax(v, index) for k, v in x_dict.items() if v is not None}
-            #import pdb; pdb.set_trace()
-            x_dict = pyg_softmax(x_dict['transition'], index)
-        return x_dict
-
-    def reset_parameters(self):
-        self.conv1.reset_parameters()
-        self.conv2.reset_parameters()
-
-        # Initialize parameters with the correct dimensions (TODO: make it authomatic)
-        self.conv1.proj.arrival.weight = torch.nn.Parameter(torch.empty(16, 2))
-        self.conv1.proj.waiting.weight = torch.nn.Parameter(torch.empty(16, 2))
-        self.conv1.proj.resources.weight = torch.nn.Parameter(torch.empty(16, 4))
-        self.conv1.proj.busy.weight = torch.nn.Parameter(torch.empty(16, 5))
-        self.conv1.proj.transition.weight = torch.nn.Parameter(torch.empty(16, 1))
-
-
-class HeteroCritic(ActorCritic):
-    def __init__(self, output_size, metadata):
-        super(HeteroCritic, self).__init__()
-        self.conv1 = HANConv(-1, 16, heads=1, metadata=metadata)  # 2 attention heads
-        self.conv2 = HANConv(16, output_size, metadata=metadata)  # we multiply by 2 due to the 2 attention heads
-        self.lin = nn.Linear(16, 1)
-
-    def forward(self, data):
-        #x, edge_index = data['graph'].nodes.type(torch.float32), data['graph'].edge_links
-        if 'graph' in data.keys():
-            x, metadata = data['graph'], data['graph'].metadata()
-        else:
-            x = data
-            index = data['transition']['batch']
-
-
-        x_dict = x.x_dict
-        edge_index_dict = x.edge_index_dict
-
-        x_dict = self.conv1(x_dict, edge_index_dict)#, edge_index).relu()
-        x_dict = {k: F.relu(v) for k, v in x_dict.items() if v is not None}
-        if 'graph' in data.keys():
-            #TODO: action masking
-            #import pdb; pdb.set_trace()
-            x_dict = {k: v.sum(dim=0, keepdim=True) for k, v in x_dict.items() if v is not None}
-            x = sum(x_dict.values()) #simple aggregation
-
-        else:
-            #x_dict = {k: scatter(v, index, dim=0, reduce='sum') for k, v in x_dict.items() if v is not None}
-            x_dict = scatter(x_dict['transition'], index, dim=0, reduce='sum')
-            x = x_dict
-
-        x = self.lin(x)
-        #out = torch.mean(torch.stack([v for v in x_dict.values()]), dim=0) #TODO: check if this is the correct way to aggregate the outputs of the different node types
-        return x
-
-        #x = self.conv1(x.x_dict, x.edge_index_dict)
-        #x = self.conv2(x.x_dict, x.edge_index_dict)
-        #x = x.sum(dim=0, keepdim=True) #TODO: reintroduce index in the observation
-
-        #return x_dict
-
 class Critic(ActorCritic):
     def __init__(self, in_channels):
         super(Critic, self).__init__()
@@ -344,24 +264,20 @@ class Critic(ActorCritic):
 
 
 
-def make_env(args, aepn = None):
+def make_env(args):
     """Return the training environment for this run."""
     if args.environment == 'GraphDeletionEnv':
         env = GraphDeletionEnv()
-    elif args.environment == 'ActionEvolutionPetriNetEnv':
-        env = AEPN_Env(aepn)
     else:
         raise Exception("Unknown environment! Are you sure it is spelled correctly?")
     env.seed(args.env_seed)
     return env
 
 
-def make_policy_network(args, metadata=None):
+def make_policy_network(args):
     """Return the policy network for this run."""
     if args.environment == 'GraphDeletionEnv':
         policy_network = Actor(1, 1) #TODO: substitute with actual number of node features/exits
-    elif args.environment == 'ActionEvolutionPetriNetEnv':
-        policy_network = HeteroActor(1, metadata=metadata)
     else:
         raise Exception("Unknown environment! Are you sure it is spelled correctly?")
     if args.policy_weights != "":
@@ -369,14 +285,12 @@ def make_policy_network(args, metadata=None):
     return policy_network
 
 
-def make_value_network(args, metadata=None):
+def make_value_network(args):
     """Return the value network for this run."""
     if args.value_model == 'none':
         value_network = None
     elif args.environment == 'GraphDeletionEnv':
-        value_network = Critic(1)
-    elif args.environment == 'ActionEvolutionPetriNetEnv':
-        value_network = HeteroCritic(1, metadata=metadata)
+        value_network = Critic(1) #TODO: substitute with actual number of node features
     else:
         raise Exception("Unknown environment! Are you sure it is spelled correctly?")
     if args.value_weights != "":
@@ -384,15 +298,10 @@ def make_value_network(args, metadata=None):
     return value_network
 
 
-def make_agent(args, metadata=None):
+def make_agent(args):
     """Return the agent for this run."""
-    policy_network = make_policy_network(args, metadata=metadata)
-    value_network = make_value_network(args, metadata=metadata)
-    #currently using HANConv instead of to_hetero
-    #if node_types and edge_types:
-    #    policy_network = to_hetero(policy_network, node_types, edge_types)
-    #    value_network = to_hetero(value_network, node_types, edge_types)
-
+    policy_network = make_policy_network(args)
+    value_network = make_value_network(args)
     if args.algorithm == 'pg':
         agent = PGAgent(policy_network=policy_network,policy_lr=args.policy_lr, policy_updates=args.policy_updates,
                         value_network=value_network, value_lr=args.value_lr, value_updates=args.value_updates,

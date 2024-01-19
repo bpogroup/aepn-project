@@ -11,19 +11,35 @@ agent.
 """
 
 import numpy as np
-#import tensorflow as tf
-#from torch_geometric.loader import DataLoader
 from torch_geometric.data import Data, Batch
 from torch_geometric.loader import DataLoader
 import torch
 from torch.utils.tensorboard import SummaryWriter
-from non_fixed_cross_entropy_loss import cross_entropy
+#from non_fixed_cross_entropy_loss import cross_entropy
 
 class GraphDataLoader(torch.utils.data.Dataset):
-    def __init__(self, batch_size, states, actions, logprobs, advantages, values):
-        data_list = [Data(x=torch.from_numpy(states[index]['graph'].nodes), edge_index=torch.from_numpy(states[index]['graph'].edge_links),
-                          y=actions[index], reward=advantages[index], logprobs=logprobs[index], value=values[index])
-                     for index in range(len(states))]
+    def __init__(self, batch_size, states, actions, logprobs, advantages, values, data_type='hetero'):
+        #OLD VERSION: the graph object was stored as a networkx graph
+        #data_list = [Data(x=torch.from_numpy(states[index]['graph'].nodes), edge_index=torch.from_numpy(states[index]['graph'].edge_links),
+        #                  y=actions[index], reward=advantages[index], logprobs=logprobs[index], value=values[index])
+        #             for index in range(len(states))]
+        if data_type == 'hetero':
+            #import pdb; pdb.set_trace()
+            data_list = []
+            for index in range(len(states)):
+                temp_h_data = states[index]['graph']
+                temp_h_data.y = actions[index]
+                temp_h_data.reward = advantages[index]
+                temp_h_data.logprobs = logprobs[index]
+                temp_h_data.value = values[index]
+                data_list.append(temp_h_data)
+            #data_list = [s['graph'] for s in states] #NEW VERSION: s should be a HeteroData object
+        elif data_type == 'homogeneous':
+            data_list = [Data(x=torch.from_numpy(states[index]['graph'].nodes), edge_index=torch.from_numpy(states[index]['graph'].edge_links),
+                             y=actions[index], reward=advantages[index], logprobs=logprobs[index], value=values[index])
+                        for index in range(len(states))]
+        else:
+            raise ValueError("data_type must be either 'hetero' or 'homogeneous'")
         self.batch = Batch.from_data_list(data_list)
         self.loader = DataLoader(data_list, batch_size=batch_size)
 
@@ -129,7 +145,7 @@ class TrajectoryBuffer:
 
     """
 
-    def __init__(self, gam=0.99, lam=0.97, action_mode="node_selection"):
+    def __init__(self, gam=0.99, lam=0.97, data_type = 'hetero', action_mode="node_selection"):
         self.gam = gam
         self.lam = lam
         self.states = []
@@ -141,6 +157,7 @@ class TrajectoryBuffer:
         self.end = 0  # index to one past end of current episode
         self.action_mode = action_mode # "node_selection" or "edge_selection"
 
+        self.data_type = data_type
     def store(self, state, action, reward, logprob, value):
         """Store the information from one interaction with the environment.
 
@@ -226,24 +243,30 @@ class TrajectoryBuffer:
 
             # filter out any states with only one action available
             if self.action_mode == "node_selection":
-                indices = [i for i in range(len(self.states[:self.start])) if len(self.states[i]['graph'].nodes) != 1] #TODO: check if this is correct (maybe != 0)
+                if self.data_type == 'hetero':
+                    #no need to filter anything
+                    states = self.states[:self.start]
+
+                elif self.data_type == 'homogeneous':
+                    indices = [i for i in range(len(self.states[:self.start])) if len(self.states[i]['graph'].nodes) != 1]
+                    states = [self.states[i] for i in indices]
+                    actions = actions[indices]
+                    logprobs = logprobs[indices]
+                    advantages = advantages[indices]
+                    values = values[indices]
+
+                    if sort:
+                        indices = np.argsort([s.shape[0] for s in states])
+                        states = [states[i] for i in indices]
+                        actions = actions[indices]
+                        logprobs = logprobs[indices]
+                        advantages = advantages[indices]
+                        values = values[indices]
             elif self.action_mode == "edge_selection":
                 indices = [i for i in range(len(self.states[:self.start])) if len(self.states[0]['graph'].edge_links) != 1]
             else:
                 raise ValueError("Action_mode must be either 'node_selection' or 'edge_selection'")
-            states = [self.states[i] for i in indices]
-            actions = actions[indices]
-            logprobs = logprobs[indices]
-            advantages = advantages[indices]
-            values = values[indices]
 
-            if sort:
-                indices = np.argsort([s.shape[0] for s in states])
-                states = [states[i] for i in indices]
-                actions = actions[indices]
-                logprobs = logprobs[indices]
-                advantages = advantages[indices]
-                values = values[indices]
 
             dataloader = GraphDataLoader(batch_size, states, actions, logprobs, advantages, values).loader
             #if batch_size is None:
@@ -304,7 +327,7 @@ class Agent:
                  policy_network, policy_lr=1e-4, policy_updates=1,
                  value_network=None, value_lr=1e-3, value_updates=25,
                  gam=0.99, lam=0.97, normalize_advantages=True, eps=0.2,
-                 kld_limit=0.01, ent_bonus=0.0):
+                 kld_limit=0.01, ent_bonus=0.0, data_type='hetero'):
         self.policy_model = policy_network
         self.policy_loss = NotImplementedError
         self.policy_optimizer = torch.optim.Adam(params=list(policy_network.parameters()),
@@ -323,6 +346,8 @@ class Agent:
         self.kld_limit = kld_limit
         self.ent_bonus = ent_bonus
 
+        self.data_type = data_type #TODO: make this univoque
+
     def act(self, state, return_logprob=False):
         """Return an action for the given state using the policy model.
 
@@ -334,7 +359,8 @@ class Agent:
             Whether to return the log probability of choosing the chosen action.
 
         """
-        logpi = self.policy_model(state).log() #.unsqueeze(0))
+        logpi = self.policy_model(state)
+        logpi = logpi.log() #.unsqueeze(0))
         action = torch.multinomial(torch.exp(logpi.squeeze(1)), 1)[0]#[0, 0] #TODO: implement deterministic policy
         if return_logprob:
             return action.item(), logpi[action].item()
@@ -421,6 +447,7 @@ class Agent:
             if logdir is not None and (i+1) % save_freq == 0:
                 self.save_policy_weights(logdir + "/policy-" + str(i+1) + ".h5")
                 self.save_value_weights(logdir + "/value-" + str(i+1) + ".h5")
+                self.save_policy_network(logdir + "/network-" + str(i+1) + ".pth")
             if tb_writer is not None:
                 tb_writer.add_scalar('mean_returns', history['mean_returns'][i], global_step=i)
                 tb_writer.add_scalar('min_returns', history['min_returns'][i], global_step=i)
@@ -538,13 +565,22 @@ class Agent:
         self.policy_model.train() #set model to training mode
 
 
-        initial_weights = {name: param.clone() for name, param in self.policy_model.named_parameters()}
+        #initial_weights = {name: param.clone() for name, param in self.policy_model.named_parameters()}
 
-        indexes = batch.batch.data
-        states = {'x': batch.x, 'edge_index': batch.edge_index, 'index': batch.batch.data}
-        actions = torch.tensor(batch.y)
-        logprobs = batch.logprobs.clone()#torch.tensor(batch.logprobs, requires_grad=True)
-        advantages = batch.logprobs.clone()#torch.tensor(batch.reward, requires_grad=True)
+       #
+        if self.data_type == 'homogeneous':
+            indexes = batch.batch.data
+            states = {'x': batch.x, 'edge_index': batch.edge_index, 'index': batch.batch.data}
+            actions = torch.tensor(batch.y)
+            logprobs = batch.logprobs.clone()#torch.tensor(batch.logprobs, requires_grad=True)
+            advantages = batch.logprobs.clone()#torch.tensor(batch.reward, requires_grad=True)
+
+        elif self.data_type == 'hetero':
+            indexes = batch['transition'].batch.data
+            states = batch
+            actions = torch.tensor(batch.y)
+            logprobs = batch.logprobs.clone()#torch.tensor(batch.logprobs, requires_grad=True)
+            advantages = batch.logprobs.clone()#torch.tensor(batch.reward, requires_grad=True) TODO: is this correct? should it be batch.reward?
 
         logpis = self.policy_model(states).log()
 
@@ -562,7 +598,7 @@ class Agent:
         self.policy_optimizer.step()
         self.policy_optimizer.zero_grad()  # zero out gradients
 
-        updated_weights = {name: param.clone() for name, param in self.policy_model.named_parameters()}
+        #updated_weights = {name: param.clone() for name, param in self.policy_model.named_parameters()}
 
         # Compare the initial and updated weights
         #for name, initial in initial_weights.items():
@@ -601,10 +637,14 @@ class Agent:
         """Fit value model on one batch of data."""
         self.value_model.train()
 
-
-        indexes = batch.batch.data
-        states = {'x': batch.x, 'edge_index': batch.edge_index, 'index': batch.batch.data}
-        values = batch.value.clone() #TODO: is this correct?
+        if self.data_type == 'homogeneous':
+            indexes = batch.batch.data
+            states = {'x': batch.x, 'edge_index': batch.edge_index, 'index': batch.batch.data}
+            values = batch.value.clone() #TODO: is this correct?
+        elif self.data_type == 'hetero':
+            indexes = batch['transition'].batch.data
+            states = batch
+            values = batch.value.clone()
 
         pred_values = self.value_model(states).squeeze()
         loss = torch.mean(self.value_loss.forward(input=pred_values, target=values))
@@ -626,6 +666,13 @@ class Agent:
         if self.value_model is not None and not isinstance(self.value_model, str):
             self.value_model.save_weights(filename)
 
+    def save_policy_network(self, filename):
+        """Save the current weights in the value model to filename."""
+        torch.save(self.policy_model, filename)
+
+    def load_policy_network(self, filename):
+        """Save the current weights in the value model to filename."""
+        self.policy_model = torch.load(torch.load(filename))
 
 def pg_surrogate_loss(new_logps, old_logps, advantages):
     """Return loss with gradient for policy gradient.

@@ -1,14 +1,14 @@
 Places={
-arrival(`{'id': 'int', 'type': 'str'}`),
-waiting(`{'id': 'int', 'type': 'str'}`),
-resources(`{'id': 'int', 'compatibility_a': 'int', 'compatibility_b': 'int'}`),
-busy(`{'resource_id': 'int', 'task_id': 'int', 'task_type': 'str', 'compatibility_a': 'int', 'compatibility_b': 'int'}`)
+arrival(`{'id': 'int', 'type': 'int'}`),
+waiting(`{'id': 'int', 'type': 'int'}`),
+resources(`{'id': 'int', 'compatibility_0': 'int', 'compatibility_1': 'int'}`),
+busy(`{'resource_id': 'int', 'task_id': 'int', 'task_type': 'int', 'compatibility_0': 'int', 'compatibility_1': 'int'}`)
 }
 
 Transitions={
 arrive(e, 0),
 start(a, 0),
-set_compatibility(e, 0),
+set_compatibility(e, 0, `is_not_set(res)`),
 complete(e, 1)
 }
 
@@ -26,6 +26,6 @@ Arcs={
 }
 
 Markings={
-(resources,1`{"id":0,"compatibility_a":0,"compatibility_b":0}@0`++1`{"id":0,"compatibility_a":0,"compatibility_b":0}@0`),
-(arrival,1`{"id":0,"type":"a"}@0`++1`{"id":0,"type":"a"}@0`)
+(resources,1`{"id":0,"compatibility_0":0,"compatibility_1":0}@0`++1`{"id":0,"compatibility_0":0,"compatibility_1":0}@0`),
+(arrival,1`{"id":0,"type":0}@0`++1`{"id":0,"type":1}@0`)
 }

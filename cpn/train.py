@@ -16,10 +16,15 @@ from torch_geometric.nn import GCNConv, GATConv, to_hetero, HANConv
 from torch_geometric.utils import softmax as pyg_softmax
 from torch.nn.functional import softmax
 
-from cpn.gym_env.new_aepn_env import AEPN_Env
-from graph.dynamic.graph_deletion_env import GraphDeletionEnv
+# import AEPN_Env from new_aepn_env.py
+from gym_env import new_aepn_env
+try:
+    from .gym_env import new_aepn_env as aepn_env
+except ImportError:
+    from gym_env import new_aepn_env as aepn_env
 
-from graph.dynamic.pg import PGAgent, PPOAgent
+from gym_env.new_aepn_env import AEPN_Env
+from pg import PGAgent, PPOAgent
 
 import torch.nn.functional as F
 import torch.nn as nn
@@ -32,7 +37,7 @@ def make_parser():
 
     env = parser.add_argument_group('environment', 'environment type')
     env.add_argument('--environment',
-                     choices=['GraphDeletionEnv', 'ActionEvolutionPetriNetEnv'],
+                     choices=['ActionEvolutionPetriNetEnv'],
                      default='ActionEvolutionPetriNetEnv',
                      help='training environment')
     env.add_argument('--env_seed',
@@ -346,9 +351,7 @@ class Critic(ActorCritic):
 
 def make_env(args, aepn = None):
     """Return the training environment for this run."""
-    if args.environment == 'GraphDeletionEnv':
-        env = GraphDeletionEnv()
-    elif args.environment == 'ActionEvolutionPetriNetEnv':
+    if args.environment == 'ActionEvolutionPetriNetEnv':
         env = AEPN_Env(aepn)
     else:
         raise Exception("Unknown environment! Are you sure it is spelled correctly?")
@@ -358,9 +361,7 @@ def make_env(args, aepn = None):
 
 def make_policy_network(args, metadata=None):
     """Return the policy network for this run."""
-    if args.environment == 'GraphDeletionEnv':
-        policy_network = Actor(1, 1) #TODO: substitute with actual number of node features/exits
-    elif args.environment == 'ActionEvolutionPetriNetEnv':
+    if args.environment == 'ActionEvolutionPetriNetEnv':
         policy_network = HeteroActor(1, metadata=metadata)
     else:
         raise Exception("Unknown environment! Are you sure it is spelled correctly?")
@@ -373,8 +374,6 @@ def make_value_network(args, metadata=None):
     """Return the value network for this run."""
     if args.value_model == 'none':
         value_network = None
-    elif args.environment == 'GraphDeletionEnv':
-        value_network = Critic(1)
     elif args.environment == 'ActionEvolutionPetriNetEnv':
         value_network = HeteroCritic(1, metadata=metadata)
     else:

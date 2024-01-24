@@ -7,23 +7,25 @@ import os
 import logging
 
 import torch
-from sb3_contrib import MaskablePPO
-from sb3_contrib.common.maskable.policies import MaskableActorCriticPolicy
-from stable_baselines3.common.logger import configure
+#from sb3_contrib import MaskablePPO
+#from sb3_contrib.common.maskable.policies import MaskableActorCriticPolicy
+#from stable_baselines3.common.logger import configure
 import copy
 import time
-from torch_geometric.data import Data, HeteroData
+from torch_geometric.data import HeteroData
 
-from graph.dynamic.train import make_parser, make_env, make_agent, make_logdir, HeteroActor
+from train import make_parser, make_env, make_agent, make_logdir
 
 try:
     from .gym_env import new_aepn_env as aepn_env
     from .pncomponents import Transition, TaggedTransition, Place, Token, Arc
     from .gym_env.additional_functions.new_color_functions import *
+    from .gym_env.additional_functions.time_functions import *
 except:
     from gym_env import new_aepn_env
     from pncomponents import Transition, TaggedTransition, Place, Token, Arc
     from gym_env.additional_functions.new_color_functions import *
+    from gym_env.additional_functions.time_functions import *
 
 class AbstractPetriNet(ABC):
     @abstractclassmethod
@@ -207,6 +209,7 @@ class PetriNet(AbstractPetriNet):
             raise Exception("Though it is strictly speaking possible, we do not allow transitions like '" + str(self) + "' without incoming arcs.")
 
         bindings = self.tokens_combinations(transition)
+        #import pdb; pdb.set_trace()
 
         # a binding must have all incoming arcs
         nr_incoming_arcs = len(transition.incoming)
@@ -223,18 +226,23 @@ class PetriNet(AbstractPetriNet):
             time = None
             enabled = True
             for (arc, token) in binding:
-                if arc.inscription in variable_values:
-                    if variable_values[arc.inscription] != token.color:
+                if arc.inscription in variable_values: #TODO: check if this condition is necessary
+                    if variable_values[arc.inscription] != token.color or token.time > self.clock: #ADDED: or token.time > self.clock
                         enabled = False
                         break
                 variable_values[arc.inscription] = token.color
+
                 if time is None or token.time > time:
+                    #import pdb; pdb.set_trace()
                     time = token.time
             if enabled and transition.guard is not None:  # if the transition has a guard, that guard must evaluate to True with the given variable binding
                 exec(compile(self.additional_functions + "result = " + transition.guard, "<string>", "exec"), variable_values)
                 enabled = variable_values['result']
             if enabled:
                 result.append((binding, time))
+            if not enabled:
+                print(f"Binding {binding} is not enabled")
+        #import pdb; pdb.set_trace()
         return result
 
     def bindings(self):
@@ -289,7 +297,7 @@ class PetriNet(AbstractPetriNet):
                 token.time = self.clock + variable_assignment['result']
             arc.dst.add_token(token)
 
-        print(f"Fired transition with binding {binding}")
+        print(f"Fired transition with binding {binding} at time {self.clock}")
 
     def simulation_run(self, length):
         run = []
@@ -315,7 +323,7 @@ class AEPetriNet(PetriNet):
     that is to be intended as (self.clock + transition.tw_low, self.clock + transition.tw_high).
     Only timed tokens with time within the time window can be used to fire the transition.
     """
-    def __init__(self, additional_functions, tag='e', observation_type='vector', length=1000):
+    def __init__(self, additional_functions, tag='e', observation_type='vector', length=100):
         super().__init__(additional_functions)
         self.actions_dict = None
         self.rewards = 0
@@ -325,7 +333,7 @@ class AEPetriNet(PetriNet):
 
         if observation_type == 'vector': #if observation type is 'graph', color_set is not used
             self.colors_set = None #if colors sets are not defined on single places, only initial colors are used for bulding observations
-    
+
     def sort_attributes(self):
         self.places.sort(key=lambda p: p._id)
         self.transitions.sort(key=lambda t: t._id)
@@ -349,10 +357,10 @@ class AEPetriNet(PetriNet):
                     timed_bindings.append((binding, time, t))
         # timed bindings are only enabled if they have time <= clock
         # if there are no such bindings, set the clock to the earliest time at which there are
+        timed_bindings.sort(key=lambda b: b[1])
         timed_bindings_curr = [(binding, time) for (binding, time, t) in timed_bindings if t.tag == self.tag] #timed bindings for the current tag
         timed_bindings_other = [(binding, time) for (binding, time, t) in timed_bindings if t.tag != self.tag] #timed bindings for the other tag
 
-        timed_bindings.sort(key=lambda b: b[1])
         timed_bindings_curr.sort(key=lambda b: b[1])
         timed_bindings_other.sort(key=lambda b: b[1])
 
@@ -361,7 +369,8 @@ class AEPetriNet(PetriNet):
             pass
         elif (len(timed_bindings_curr) > 0 and timed_bindings_curr[0][1] > self.clock):
             if len(timed_bindings_other) > 0:
-                if (timed_bindings_other[0][1] < timed_bindings_curr[0][1]):
+                if (timed_bindings_other[0][1] <= timed_bindings_curr[0][1]):
+                    #import pdb; pdb.set_trace()
                     self.switch_tag()
                     self.clock = timed_bindings_other[0][1]
                     print(f"Tag switched to {self.tag} at time {self.clock}")
@@ -380,6 +389,7 @@ class AEPetriNet(PetriNet):
 
         # now return the untimed bindings + the timed bindings that have time <= clock
         bindings = untimed_bindings + [(binding, time) for (binding, time) in timed_bindings_curr if time <= self.clock]
+        #import pdb; pdb.set_trace()
         return bindings, active_model
 
     def fire(self, timed_binding):
@@ -415,7 +425,7 @@ class AEPetriNet(PetriNet):
 
         self.update_reward(timed_binding)
 
-        print(f"Fired transition with binding {binding}")
+        print(f"Fired transition with binding {binding} at time {self.clock}")
 
     def update_reward(self, timed_binding):
         (binding, time) = timed_binding
@@ -590,7 +600,7 @@ class AEPetriNet(PetriNet):
             node_types.append('transition')
 
             self.expanded_pn = self.expand() #expand the petri net into a new petri net with 1-bounded places
-            print(self.expanded_pn)
+            #print(self.expanded_pn)
 
             # Update the HeteroData object with the places attributes and the transition nodes
             for n_t in node_types:
@@ -606,7 +616,7 @@ class AEPetriNet(PetriNet):
                     else:
                         #import pdb; pdb.set_trace()
                         ret_graph[n_t].x = torch.empty(0, len(self.by_id[n_t].tokens_attributes.keys())) #create empty placeholder of the right size
-                        print(f"Warning: no tokens of type {n_t} found in the marking. Skipping to the next node type")
+                        #print(f"Warning: no tokens of type {n_t} found in the marking. Skipping to the next node type")
                 else:
                     t_nodes = []
                     for i, t in enumerate(self.expanded_pn.transitions):
@@ -615,9 +625,13 @@ class AEPetriNet(PetriNet):
                         elif t.tag == 'a':
                             incoming = [(self.by_id[f'({a.src._id.split(".")[0]}, {a.dst._id.split(".")[0]})'] , a.src) for a in self.expanded_pn.arcs if a.dst._id == t._id]
                             b_list = [(el[0], el[1].marking[0]) for el in incoming]
-                            b_time = min([t[1].time for t in b_list])
-                            pn_bindings[i] = (b_list, b_time)
-                            t_nodes.append(torch.tensor([1]).type(torch.float32))
+                            b_time = max([t[1].time for t in b_list]) #changed min to max, it was an error!
+                            #import pdb; pdb.set_trace()
+                            if b_time <= self.clock:
+                                pn_bindings[i] = (b_list, b_time)
+                                t_nodes.append(torch.tensor([1]).type(torch.float32))
+                            else:
+                                t_nodes.append(torch.tensor([0]).type(torch.float32))
 
                     ret_graph[n_t].x = torch.stack(t_nodes)
                     mask_graph[n_t].x = torch.stack(t_nodes)
@@ -651,9 +665,9 @@ class AEPetriNet(PetriNet):
                             mask_graph[place._id, 'edge', 'transition'].edge_index = torch.empty(2, 0).type(torch.int64)
 
                     #import pdb; pdb.set_trace()
-                    print("Added missing edges")
+                    #print("Added missing edges")
 
-
+            #import pdb; pdb.set_trace()
             self.actions_dict = pn_bindings
             return {'graph': ret_graph, 'mask': mask_graph, 'actions_dict': pn_bindings}
 
@@ -744,7 +758,6 @@ class AEPetriNet(PetriNet):
 
             action_bindings = [bindings[ind] for ind, b in enumerate(inscr_color_bindings) if b==action] #select only the bindings that comply with the chosen action
 
-            #import pdb; pdb.set_trace();
             if len(action_bindings) > 0:
                 prev_tag = self.tag
                 binding = random.choice(action_bindings)
@@ -781,7 +794,7 @@ class AEPetriNet(PetriNet):
                 binding = random.choice(bindings)
                 run.append(binding)
                 self.fire(binding)
-                print(binding)
+                #print(binding)
                 i += 1
 
         print(f"Total reward random over {length} steps: {self.rewards} \n")
@@ -805,15 +818,15 @@ class AEPetriNet(PetriNet):
             os.makedirs(out_folder_name)
             os.makedirs(log_dir)
             
-        if load_model:
-            model = MaskablePPO.load(out_path, env, n_steps = 50)
-        else:
-            model = MaskablePPO(MaskableActorCriticPolicy, env, n_steps = 50, verbose=1)
+        #if load_model:
+        #    model = MaskablePPO.load(out_path, env, n_steps = 50)
+        #else:
+        #    model = MaskablePPO(MaskableActorCriticPolicy, env, n_steps = 50, verbose=1)
         
-        model.set_logger(configure(log_dir, ["stdout", "csv", "tensorboard"]))
-        model.learn(total_timesteps=num_steps)
-        env.reset()
-        model.save(out_path)
+        ##model.set_logger(configure(log_dir, ["stdout", "csv", "tensorboard"]))
+        #model.learn(total_timesteps=num_steps)
+        #env.reset()
+        #model.save(out_path)
 
         print("Training over")
 
@@ -853,33 +866,7 @@ class AEPetriNet(PetriNet):
                 with open(os.path.join(logdir, "results.csv"), 'a') as f:
                     f.write(f"{reward},{length}\n")
 
-    def testing_run(self, length, additional_functions = None, out_model_name="model.pt", out_folder_name = './out'):
-        """
-        Loads a trained model and performs length steps of evaluation
-        """
-        self.length = length
-
-        out_path = os.path.join('out', out_model_name)
-        model = MaskablePPO.load(out_path)
-        env = aepn_env.AEPN_Env(self)
-        env.reset()
-
-        
-        done = False
-        t_rewards = 0
-        while not done:
-            # Retrieve current action mask
-            obs = self.get_observation()
-            action_masks = env.action_masks()
-            action, _states = model.predict(obs, action_masks=action_masks)
-            obs, rewards, done, info = env.step(action)
-            t_rewards += rewards #unused
-
-
-        total_reward_ppo = env.pn.rewards        
-        return total_reward_ppo
-
-    def new_testing_run(self, length, additional_functions=None, out_model_name="network-1.pth", out_folder_name='./out'):
+    def new_testing_run(self, length, additional_functions=None, out_model_name="network-500.pth", out_folder_name='./out'):
         """
         Loads a trained model and performs length steps of evaluation
         """
@@ -931,7 +918,7 @@ class AEPetriNet(PetriNet):
                 #print(binding)
                 i += 1
             elif len(bindings) > 0 and self.tag == 'a': #give control to the gym env by returning the current observation
-                return self.get_observation(), self.clock > self.length, i
+                return self.get_observation(), self.clock > self.length or not active_model, i
             else:
                 active_model = False
 
@@ -940,20 +927,28 @@ class AEPetriNet(PetriNet):
 
 
 
-
+#TODO: collapse the number of places in the network by merging places with the same marking and the same incoming and outgoing arcs adding a feature that counts the number of occurrences of the same token in the place
 if __name__ == "__main__":
     test_cpn = False #test standard cpn implementation
-    
-    test_task_assignment = True #test a-e cpn for task assignment problem
+
+    test_simple_aepn = True #test a simple aepn for testing purposes
+    test_task_assignment = False #test a-e cpn for task assignment problem
     
     test_simulation = False
-    test_training = True#True
+    test_training = True
     test_inference = False
 
+    #color functions
     f = open('./gym_env/additional_functions/new_color_functions.py', 'r')
     temp = f.read()
     f.close()
-    my_functions = temp
+
+    #time functions
+    f_t = open('./gym_env/additional_functions/time_functions.py', 'r')
+    temp_t = f_t.read()
+    f_t.close()
+
+    my_functions = temp + '\n' + temp_t
     pn = AEPetriNet(my_functions, observation_type='graph')
 
     if test_task_assignment:
@@ -977,7 +972,7 @@ if __name__ == "__main__":
 
         pn.add_arc_by_ids("resources", "start", "resource")
         pn.add_arc_by_ids("waiting", "start", "case")
-        pn.add_arc_by_ids("start", "busy", "new_combine(case, resource)", time_expression=1)
+        pn.add_arc_by_ids("start", "busy", "new_combine(case, resource)", time_expression="get_compatibility(case, resource)")
 
         pn.add_arc_by_ids("busy", "complete", "case_resource")
         pn.add_arc_by_ids("complete", "resources", "new_split(case_resource)", time_expression=0)
@@ -987,7 +982,29 @@ if __name__ == "__main__":
         pn.add_mark_by_id("arrival", {'id': 0, 'type': 0}, 0)
         pn.add_mark_by_id("arrival", {'id': 1, 'type': 1}, 0)
 
-    print(pn)
+    #print(pn)
+    elif test_simple_aepn:
+        #orders could be lost if they are not processed within 1 time unit
+        pn.add_place(Place("arrival", tokens_attributes={"type": "int"}))
+        pn.add_place(Place("waiting", tokens_attributes={"type": "int"}))
+        pn.add_place(Place("resources", tokens_attributes={"type": "int"}))
+
+        pn.add_transition(TaggedTransition("arrive", tag='e', reward=0))
+        pn.add_transition(TaggedTransition("start", tag='a', reward="get_reward(case, resource)"))
+        #pn.add_transition(TaggedTransition("lose_order", tag='e', reward=0))
+
+        pn.add_arc_by_ids("arrival", "arrive", "x")
+        pn.add_arc_by_ids("arrive", "arrival", "x", time_expression=1)
+        pn.add_arc_by_ids("arrive", "waiting", "x", time_expression=0)
+        #pn.add_arc_by_ids("waiting", "lose_order", "x", guard_function="is_late(x)", time_expression=0)
+        pn.add_arc_by_ids("resources", "start", "resource")
+        pn.add_arc_by_ids("waiting", "start", "case")
+        pn.add_arc_by_ids("start", "resources", "resource", time_expression=1)
+
+        pn.add_mark_by_id("resources", {'type': 0}, 0)
+        pn.add_mark_by_id("resources", {'type': 1}, 0)
+        pn.add_mark_by_id("arrival", {'type': 0}, 0)
+        pn.add_mark_by_id("arrival", {'type': 1}, 0)
 
     if test_simulation:
         test_run = pn.simulation_run(1000)
@@ -1001,9 +1018,9 @@ if __name__ == "__main__":
 
     elif test_inference:
 
-        length = 100
+        length = 50
         
-        repetitions = 1000
+        repetitions = 1
 
         r_vec_ppo = []
         r_vec_random = []

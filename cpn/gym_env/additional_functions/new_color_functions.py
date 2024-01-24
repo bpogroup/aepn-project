@@ -1,8 +1,6 @@
 import json
 import numpy as np
 
-from cpn.pncomponents import Token, Color
-
 
 def check_compatibility(c1, c2):
     c1 = c1.split(';')
@@ -173,11 +171,11 @@ def set_compatibility(resource):
     """
     Sets the resource's compatibilities
     """
-    if resource['id']=='0':
+    if resource['id']==0:
         resource['compatibility_0'] = 1
-        resource['compatibility_1'] = 2
-    elif resource['id']=='1':
-        resource['compatibility_0'] = 2
+        resource['compatibility_1'] = 10
+    elif resource['id']==1:
+        resource['compatibility_0'] = 10
         resource['compatibility_1'] = 1
 
     resource['is_set'] = True
@@ -187,4 +185,10 @@ def new_combine(case, resource):
     return {'resource_id': resource['id'], 'task_id': case['id'], 'task_type': case['type'], 'compatibility_0': resource['compatibility_0'], 'compatibility_1' : resource['compatibility_1']}
 
 def new_split(case_resource):
-    return {'id':case_resource['resource_id'], 'compatibility_0': case_resource['compatibility_0'], 'compatibility_1': case_resource['compatibility_1'], 'is_set': 0}
+    return {'id':case_resource['resource_id'], 'compatibility_0': case_resource['compatibility_0'], 'compatibility_1': case_resource['compatibility_1'], 'is_set': False}
+
+def get_reward(case, resource):
+    if case['type'] == resource['type']:
+        return 10
+    else:
+        return 0

@@ -467,8 +467,8 @@ class Agent:
                 tb_writer.add_scalar('min_ep_lens', history['min_ep_lens'][i], global_step=i)
                 tb_writer.add_scalar('max_ep_lens', history['max_ep_lens'][i], global_step=i)
                 tb_writer.add_scalar('std_ep_lens', history['std_ep_lens'][i], global_step=i)
-                tb_writer.add_histogram('returns', return_history['returns'], global_step=i) #BROKEN
-                tb_writer.add_histogram('lengths', return_history['lengths'], global_step=i)
+                #tb_writer.add_histogram('returns', return_history['returns'], global_step=i) #BROKEN
+                #tb_writer.add_histogram('lengths', return_history['lengths'], global_step=i)
                 tb_writer.add_scalar('policy_updates', history['policy_updates'][i], global_step=i)
                 tb_writer.add_scalar('delta_policy_loss', history['delta_policy_loss'][i], global_step=i)
                 tb_writer.add_scalar('policy_ent', history['policy_ent'][i], global_step=i)

@@ -1,7 +1,5 @@
-import gymnasium as gym
-from gym import spaces, Env
+from gymnasium import spaces, Env
 from typing import List
-import numpy as np
 import copy
 
 class AEPN_Env(Env):
@@ -36,22 +34,21 @@ class AEPN_Env(Env):
 				'mask': spaces.Box(low=0, high=1, shape=(1,))
 			}
 		)
+		#currently unused
 
 
-		#self.observation_space = spaces.Box(shape=(len(pn_observations),), low = 0, high = np.iinfo(np.uint8).max, dtype=np.uint8) #observations are the state representation that is shown to the solving algorithm
-		#self.action_space = spaces.Discrete(len(self.pn_actions)) #actions are all the available decisions (invalid actions are defined on a single observation through a masking mechanism)
-		
 		#mimic the network's organization
 		self.run = []
 		self.i = 0
 		self.active_model = True
-		self.prev_tag = self.pn.tag
+		#self.prev_tag = self.pn.tag
 
 	def step(self, action):
         
 		old_rewards = self.pn.rewards
 		old_clock = self.pn.clock
 
+		#import pdb; pdb.set_trace()
 		observation, loc_i = self.pn.apply_action(self.pn_actions[action])
 
 		self.i += loc_i

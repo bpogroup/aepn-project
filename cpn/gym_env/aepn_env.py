@@ -1,5 +1,4 @@
-import gymnasium as gym
-from gym import spaces, Env
+from gymnasium import spaces, Env
 from typing import List
 import numpy as np
 import copy

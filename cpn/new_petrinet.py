@@ -1,10 +1,8 @@
 import random
-import json
 import itertools
 import shutil
 from abc import ABC, abstractclassmethod
 import os
-import logging
 
 import torch
 #from sb3_contrib import MaskablePPO
@@ -12,21 +10,26 @@ import torch
 #from stable_baselines3.common.logger import configure
 import copy
 import time
-from torch_geometric.data import HeteroData
+from torch_geometric.data import HeteroData, Data
 
 from train import make_parser, make_env, make_agent, make_logdir
 
 try:
+    from .gym_env.additional_functions.function_dispatcher import FunctionDispatcher
     from .gym_env import new_aepn_env as aepn_env
     from .pncomponents import Transition, TaggedTransition, Place, Token, Arc
     from .gym_env.additional_functions.new_color_functions import *
     from .gym_env.additional_functions.time_functions import *
+    from .gym_env.additional_functions import new_color_functions
+    from .gym_env.additional_functions import time_functions
 except:
+    from gym_env.additional_functions.function_dispatcher import FunctionDispatcher
     from gym_env import new_aepn_env
     from pncomponents import Transition, TaggedTransition, Place, Token, Arc
     from gym_env.additional_functions.new_color_functions import *
     from gym_env.additional_functions.time_functions import *
-
+    from gym_env.additional_functions import new_color_functions
+    from gym_env.additional_functions import time_functions
 class AbstractPetriNet(ABC):
     @abstractclassmethod
     def __init__(self):
@@ -61,8 +64,8 @@ class PetriNet(AbstractPetriNet):
         self.additional_functions = additional_functions
         if not additional_functions.endswith("\n"):
             self.additional_functions += "\n"
-        compiled = compile(self.additional_functions, "<string>", 'exec')  # this is to test if the additional functions are well-formed
-        if "result" in compiled.co_names:
+        self.compiled = compile(self.additional_functions, "<string>", 'exec')  # this is to test if the additional functions are well-formed
+        if "result" in self.compiled.co_names:
             raise "'result' is a reserved name. It should not appear in the additional function definitions."
 
         self.by_id = dict()
@@ -236,7 +239,10 @@ class PetriNet(AbstractPetriNet):
                     #import pdb; pdb.set_trace()
                     time = token.time
             if enabled and transition.guard is not None:  # if the transition has a guard, that guard must evaluate to True with the given variable binding
-                exec(compile(self.additional_functions + "result = " + transition.guard, "<string>", "exec"), variable_values)
+                #TODO: check if it works
+                exec(self.compiled, variable_values)  # execute the compiled code
+                exec("result = " + transition.guard, variable_values)  # evaluate the guard
+                #exec(compile(self.additional_functions + "result = " + transition.guard, "<string>", "exec"), variable_values)
                 enabled = variable_values['result']
             if enabled:
                 result.append((binding, time))
@@ -297,7 +303,7 @@ class PetriNet(AbstractPetriNet):
                 token.time = self.clock + variable_assignment['result']
             arc.dst.add_token(token)
 
-        print(f"Fired transition with binding {binding} at time {self.clock}")
+        #print(f"Fired transition with binding {binding} at time {self.clock}")
 
     def simulation_run(self, length):
         run = []
@@ -325,6 +331,12 @@ class AEPetriNet(PetriNet):
     """
     def __init__(self, additional_functions, tag='e', observation_type='vector', length=100):
         super().__init__(additional_functions)
+
+        if platform.system() == 'Windows':
+            self.dispatcher = FunctionDispatcher(["cpn.gym_env.additional_functions.new_color_functions", "cpn.gym_env.additional_functions.time_functions"])
+        elif platform.system() == 'Linux':
+            self.dispatcher = FunctionDispatcher(["gym_env.additional_functions.new_color_functions", "gym_env.additional_functions.time_functions"])
+
         self.actions_dict = None
         self.rewards = 0
         self.tag = tag
@@ -373,7 +385,7 @@ class AEPetriNet(PetriNet):
                     #import pdb; pdb.set_trace()
                     self.switch_tag()
                     self.clock = timed_bindings_other[0][1]
-                    print(f"Tag switched to {self.tag} at time {self.clock}")
+                    #print(f"Tag switched to {self.tag} at time {self.clock}")
                     timed_bindings_curr = timed_bindings_other
                 else:
                     self.clock = timed_bindings_curr[0][1]
@@ -382,7 +394,7 @@ class AEPetriNet(PetriNet):
         elif len(timed_bindings_curr) == 0 and len(timed_bindings_other) != 0:
             self.switch_tag()
             self.clock = timed_bindings_other[0][1]
-            print(f"Tag switched to {self.tag} at time {self.clock}")
+            #print(f"Tag switched to {self.tag} at time {self.clock}")
             timed_bindings_curr = timed_bindings_other
         else:
             active_model = False
@@ -416,16 +428,25 @@ class AEPetriNet(PetriNet):
             token = Token(None)
             if arc.inscription is not None:  # if the arc has an inscription
                 #import pdb; pdb.set_trace()
-                exec(compile(self.additional_functions + "result = " + arc.inscription, "<string>", "exec"), variable_assignment)
-                token.color = variable_assignment['result']
+                #exec(compile(self.additional_functions + "result = " + arc.inscription, "<string>", "exec"), variable_assignment)
+                #use dispatcher to call the function
+                dispatcher_result = self.dispatcher.dispatch(arc.inscription, **variable_assignment)
+                token.color = dispatcher_result
+                #token.color = variable_assignment['result']
             if arc.time_expression is not None:  # if the transition has a time expression
-                exec(compile(self.additional_functions + "result = " + str(arc.time_expression), "<string>", "exec"), variable_assignment)
+                #exec(compile(self.additional_functions + "result = " + str(arc.time_expression), "<string>", "exec"), variable_assignment)
+                if isinstance(arc.time_expression, (int, float, complex)):
+                    variable_assignment['result'] = arc.time_expression
+                else:
+                    dispatcher_result = self.dispatcher.dispatch(arc.time_expression, **variable_assignment)
+                    token.color = dispatcher_result
+
                 token.time = self.clock + variable_assignment['result']
             arc.dst.add_token(token)
 
         self.update_reward(timed_binding)
 
-        print(f"Fired transition with binding {binding} at time {self.clock}")
+        #print(f"Fired transition with binding {binding} at time {self.clock}")
 
     def update_reward(self, timed_binding):
         (binding, time) = timed_binding
@@ -441,7 +462,16 @@ class AEPetriNet(PetriNet):
                     # assign values to the variables on the arcs
                     if arc.inscription is not None:
                         variable_assignment[arc.inscription] = token.color
-                exec(compile(self.additional_functions + "result = " + transition.reward, "<string>", "exec"), variable_assignment)
+                #exec(compile(self.additional_functions + "result = " + transition.reward, "<string>", "exec"), variable_assignment)
+
+                if isinstance(transition.reward, (int, float, complex)):
+                    variable_assignment['result'] = transition.reward
+                else:
+                    dispatcher_result = self.dispatcher.dispatch(transition.reward, **variable_assignment)
+                    variable_assignment['result'] = dispatcher_result
+
+
+                #self.rewards += dispatcher_result
                 self.rewards += variable_assignment['result']
 
 
@@ -497,9 +527,12 @@ class AEPetriNet(PetriNet):
                     for variable_values in variable_values_list:
                         if t.guard:
                             v_v_original = {**variable_values}
-                            exec(compile(self.additional_functions + "result = " + t.guard, "<string>", "exec"),
-                                 variable_values)
-                            enabled = variable_values['result']
+                            #exec(compile(self.additional_functions + "result = " + t.guard, "<string>", "exec"),
+                            #     variable_values)
+                            #enabled = variable_values['result']
+                            dispatcher_result = self.dispatcher.dispatch(t.guard, variable_values)
+                            enabled = dispatcher_result
+
                             if enabled: color_associations.append(v_v_original)
                         else:
                             color_associations.append(**variable_values)
@@ -529,9 +562,11 @@ class AEPetriNet(PetriNet):
                     for variable_values in variable_values_list:
                         if t.guard:
                             v_v_original = {**variable_values}
-                            exec(compile(self.additional_functions + "result = " + t.guard, "<string>", "exec"),
-                                 variable_values)
-                            enabled = variable_values['result']
+                            #exec(compile(self.additional_functions + "result = " + t.guard, "<string>", "exec"),
+                            #     variable_values)
+                            #enabled = variable_values['result']
+                            dispatcher_result = self.dispatcher.dispatch(t.guard, variable_values)
+                            enabled = dispatcher_result
                             if enabled: color_associations.append(v_v_original)
                         else:
                             color_associations.append(variable_values)
@@ -597,32 +632,34 @@ class AEPetriNet(PetriNet):
             mask_graph = HeteroData()
             pn_bindings = {} #the observation contains the bindings corresponding to expanded action nodes
             node_types = [p._id for p in self.places]#[set(p.tokens_attributes.keys()) for p in self.places]
-            node_types.append('transition')
+            node_types.append('a_transition')
+            node_types.append('e_transition')
 
             self.expanded_pn = self.expand() #expand the petri net into a new petri net with 1-bounded places
             #print(self.expanded_pn)
 
             # Update the HeteroData object with the places attributes and the transition nodes
             for n_t in node_types:
-                if n_t != 'transition':
+                if n_t != 'a_transition' and n_t != 'e_transition':
                     p_nodes = []
+                    # Check if n_t is already a key in ret_graph
                     for p in self.expanded_pn.places:
                         if p._id.split('.')[0] == n_t:
                             for token in p.marking:  # will always be only one
                                 token_value = torch.tensor([value for key, value in token.color.items()]).type(torch.float32)
                                 p_nodes.append(token_value)
-                    if p_nodes:
-                        ret_graph[n_t].x = torch.stack(p_nodes)
-                    else:
-                        #import pdb; pdb.set_trace()
-                        ret_graph[n_t].x = torch.empty(0, len(self.by_id[n_t].tokens_attributes.keys())) #create empty placeholder of the right size
+                    #if p_nodes:
+                    #    ret_graph[n_t].x = torch.stack(p_nodes)
+                    #else:
+                    #    ret_graph[n_t].x = torch.empty(0, len(self.by_id[n_t].tokens_attributes.keys())) #create empty placeholder of the right size
                         #print(f"Warning: no tokens of type {n_t} found in the marking. Skipping to the next node type")
-                else:
+                    nodes = p_nodes
+                elif n_t == 'a_transition':
                     t_nodes = []
-                    for i, t in enumerate(self.expanded_pn.transitions):
-                        if t.tag == 'e':
-                            t_nodes.append(torch.tensor([0]).type(torch.float32))
-                        elif t.tag == 'a':
+                    t_nodes_mask = []
+                    a_transition_dict = {} #helper to keep track of the transitions indexes in the graph
+                    for i, t in enumerate([at for at in self.expanded_pn.transitions if at.tag=='a']):
+                        if t.tag == 'a':
                             incoming = [(self.by_id[f'({a.src._id.split(".")[0]}, {a.dst._id.split(".")[0]})'] , a.src) for a in self.expanded_pn.arcs if a.dst._id == t._id]
                             b_list = [(el[0], el[1].marking[0]) for el in incoming]
                             b_time = max([t[1].time for t in b_list]) #changed min to max, it was an error!
@@ -630,11 +667,40 @@ class AEPetriNet(PetriNet):
                             if b_time <= self.clock:
                                 pn_bindings[i] = (b_list, b_time)
                                 t_nodes.append(torch.tensor([1]).type(torch.float32))
+                                t_nodes_mask.append(torch.tensor([1]).type(torch.float32))
                             else:
+                                t_nodes_mask.append(torch.tensor([0]).type(torch.float32))
                                 t_nodes.append(torch.tensor([0]).type(torch.float32))
 
-                    ret_graph[n_t].x = torch.stack(t_nodes)
-                    mask_graph[n_t].x = torch.stack(t_nodes)
+                            a_transition_dict[t._id] = i
+
+
+                    mask_graph[n_t].x = torch.stack(t_nodes_mask)
+                    nodes = t_nodes
+                else:
+                    e_transition_dict = {}  # helper to keep track of the transitions indexes in the graph
+                    t_nodes = []
+                    for i, t in enumerate([et for et in self.expanded_pn.transitions if et.tag=='e']):
+                        if t.tag == 'e':
+                            #t_nodes_mask.append(torch.tensor([0]).type(torch.float32))
+                            t_nodes.append(torch.tensor([]).type(torch.float32))
+
+                        e_transition_dict[t._id] = i
+                    nodes = t_nodes
+
+                if nodes:
+
+                    if n_t not in ret_graph.node_types:
+                        # If not, create a new Data object and assign it to ret_graph[n_t]
+                        #import pdb; pdb.set_trace()
+                        ret_graph[n_t].x = torch.stack(nodes)
+                    else:
+                        # If yes, stack the new nodes to the existing ones
+                        ret_graph[n_t].x = torch.cat((ret_graph[n_t].x, torch.stack(nodes)), dim=1)
+                else:
+                    ret_graph[n_t].x = torch.empty(0, len(
+                        self.by_id[n_t].tokens_attributes.keys()))  # create empty placeholder of the right size
+
 
             #import pdb; pdb.set_trace()
             # Update the HeteroData object with the arcs
@@ -642,32 +708,57 @@ class AEPetriNet(PetriNet):
             for e_t in edge_types:
                 if e_t != 'self_loop': #currently self loops are not supported
                     for a in self.expanded_pn.arcs:
-                        if ret_graph[a.src._id.split('.')[0]]: #if the place has tokens inside of it
-                            #ret_graph[a.src._id.split('.')[0], 'edge', a.dst._id.split('.')[0]].edge_index = torch.tensor([[i for i in range(len(ret_graph[a.src._id.split('.')[0]].x))], [i for i in range(len(ret_graph[a.src._id.split('.')[0]].x))]]).type(torch.float32)
-                            ret_graph[
-                                a.src._id.split('.')[0], 'edge', 'transition'].edge_index = torch.tensor(
-                                [[i for i in range(len(ret_graph[a.src._id.split('.')[0]].x))],
-                                 [i for i in range(len(ret_graph[a.src._id.split('.')[0]].x))]]).type(torch.int64)
-                        if ret_graph[a.dst._id.split('.')[0]]: #if the place has tokens inside of it
-                            #ret_graph[a.src._id.split('.')[0], 'edge', a.dst._id.split('.')[0]].edge_index = torch.tensor([[i for i in range(len(ret_graph[a.dst._id.split('.')[0]].x))], [i for i in range(len(ret_graph[a.dst._id.split('.')[0]].x))]]).type(torch.float32)
-                            ret_graph[
-                                'transition', 'edge', a.dst._id.split('.')[0]].edge_index = torch.tensor(
-                                [[i for i in range(len(ret_graph[a.dst._id.split('.')[0]].x))],
-                                 [i for i in range(len(ret_graph[a.dst._id.split('.')[0]].x))]]).type(torch.int64)
-                    for place in self.places: #create empyty placeholders for arcs that are not represented in the expanded network
-                        #import pdb;
-                        #pdb.set_trace()
-                        if not ret_graph['transition', 'edge', place._id]:
-                            ret_graph['transition', 'edge', place._id].edge_index = torch.empty(2, 0).type(torch.int64)
-                            mask_graph['transition', 'edge', place._id].edge_index = torch.empty(2, 0).type(torch.int64)
-                        if not ret_graph[place._id, 'edge', 'transition']:
-                            ret_graph[place._id, 'edge', 'transition'].edge_index = torch.empty(2, 0).type(torch.int64)
-                            mask_graph[place._id, 'edge', 'transition'].edge_index = torch.empty(2, 0).type(torch.int64)
+                        #import pdb; pdb.set_trace()
+                        if type(a.src) is Place and ret_graph[a.src._id.split('.')[0]]: #if the place has tokens inside of it
+                            if a.dst.tag == 'a':
+                                key = (a.src._id.split('.')[0], 'edge', 'a_transition')
+                                new_values = torch.tensor(
+                                    [[int(a.src._id.split('.')[1])],
+                                     [a_transition_dict[a.dst._id]]]).type(torch.int64)
+                            else:
+                                key = (a.src._id.split('.')[0], 'edge', 'e_transition')
+                                new_values = torch.tensor(
+                                    [[int(a.src._id.split('.')[1])],
+                                     [e_transition_dict[a.dst._id]]]).type(torch.int64)
+                            #key = (a.src._id.split('.')[0], 'edge', 'transition')
+
+
+
+                        if type(a.dst) is Place and ret_graph[a.dst._id.split('.')[0]]: #if the place has tokens inside of it
+                            if a.src.tag == 'a':
+                                key = ('a_transition', 'edge', a.dst._id.split('.')[0])
+                                new_values = torch.tensor(
+                                    [[a_transition_dict[a.src._id]],
+                                     [int(a.dst._id.split('.')[1])]]).type(torch.int64)
+                            else:
+                                key = ('e_transition', 'edge', a.dst._id.split('.')[0])
+                                new_values = torch.tensor(
+                                    [[e_transition_dict[a.src._id]],
+                                     [int(a.dst._id.split('.')[1])]]).type(torch.int64)
+                            #key = ('transition', 'edge', a.dst._id.split('.')[0])
+
+
+                        #import pdb; pdb.set_trace()
+                        if key not in ret_graph.edge_types:
+                            ret_graph[key].edge_index = new_values
+                        else:
+                            ret_graph[key].edge_index = torch.cat((ret_graph[key].edge_index, new_values), dim=1)
+
+                    #TODO: verify this is not necessary
+                    #for place in self.places: #create empyty placeholders for arcs that are not represented in the expanded network
+
+                    #    if not ret_graph['transition', 'edge', place._id]:
+                    #        ret_graph['transition', 'edge', place._id].edge_index = torch.empty(2, 0).type(torch.int64)
+                    #        mask_graph['transition', 'edge', place._id].edge_index = torch.empty(2, 0).type(torch.int64)
+                    #    if not ret_graph[place._id, 'edge', 'transition']:
+                    #        ret_graph[place._id, 'edge', 'transition'].edge_index = torch.empty(2, 0).type(torch.int64)
+                    #        mask_graph[place._id, 'edge', 'transition'].edge_index = torch.empty(2, 0).type(torch.int64)
 
                     #import pdb; pdb.set_trace()
                     #print("Added missing edges")
 
             #import pdb; pdb.set_trace()
+            #print(ret_graph)
             self.actions_dict = pn_bindings
             return {'graph': ret_graph, 'mask': mask_graph, 'actions_dict': pn_bindings}
 
@@ -693,7 +784,7 @@ class AEPetriNet(PetriNet):
 
         exp_pn_base_places = set(exp_pn_base_places)
 
-        for t in self.transitions:
+        for index, t in enumerate(self.transitions):
 
             if t.tag == 'e': #E transitions are not expanded (they are not affected by the action) def __init__(self, _id, tag, reward, guard=None):
                 expanded_pn.add_transition(TaggedTransition(t._id, tag=t.tag, reward=t.reward, guard=t.guard))
@@ -713,14 +804,16 @@ class AEPetriNet(PetriNet):
                 transition_bindings = self.transition_bindings(t)  # operated on the non-expanded network
                 #import pdb; pdb.set_trace()
                 for i, b in enumerate(transition_bindings):
+                    out_places = [] #list of places outoing from the transition
                     expanded_pn.add_transition(TaggedTransition(t._id + '.' + str(i), tag=t.tag, reward=t.reward, guard=t.guard))
                     for arc, token in b[0]:
                         for place in expanded_pn.places:
                             if place._id.split('.')[0] == arc.src._id and place.marking[0] == token:
                                 expanded_pn.add_arc_by_ids(place._id, arc.dst._id + '.' + str(i), arc.inscription, arc.time_expression)
+                                out_places.append(place)
                     for arc in self.arcs:
                         if arc.src == t:
-                            for place in expanded_pn.places:
+                            for place in out_places:
                                 if place._id.split('.')[0] == arc.dst._id:
                                     expanded_pn.add_arc_by_ids(t._id + '.' + str(i), place._id, arc.inscription, arc.time_expression)
                     else:
@@ -751,9 +844,11 @@ class AEPetriNet(PetriNet):
         """
         Applies the action chosen by the RL algorithm to the network
         """
-        bindings, active_model = self.bindings()
+
 
         if self.observation_type == 'vector':
+            bindings, active_model = self.bindings()
+
             inscr_color_bindings = self.bindings_to_associations(bindings)
 
             action_bindings = [bindings[ind] for ind, b in enumerate(inscr_color_bindings) if b==action] #select only the bindings that comply with the chosen action
@@ -768,10 +863,15 @@ class AEPetriNet(PetriNet):
                 raise Exception("The chosen action seems to be unavailable! No action will be performed.")
 
         elif self.observation_type == 'graph':
+            #print(f'About to fire binding {action}')
             #import pdb; pdb.set_trace()
             self.fire(action)
-            self.bindings()
-            return self.get_observation(), 1
+            self.bindings() #updates clock and tag if necessary
+            if self.tag == 'a':
+                return self.get_observation(), 1
+            else:
+                return {}, 1
+
 
     def get_nodes_edges_types(self):
         """
@@ -922,10 +1022,8 @@ class AEPetriNet(PetriNet):
             else:
                 active_model = False
 
+
         return self.get_observation(), self.clock > self.length or not active_model, i
-
-
-
 
 #TODO: collapse the number of places in the network by merging places with the same marking and the same incoming and outgoing arcs adding a feature that counts the number of occurrences of the same token in the place
 if __name__ == "__main__":
@@ -938,15 +1036,31 @@ if __name__ == "__main__":
     test_training = True
     test_inference = False
 
-    #color functions
-    f = open('./gym_env/additional_functions/new_color_functions.py', 'r')
-    temp = f.read()
-    f.close()
+    import platform
 
-    #time functions
-    f_t = open('./gym_env/additional_functions/time_functions.py', 'r')
-    temp_t = f_t.read()
-    f_t.close()
+    if platform.system() == 'Windows':
+        # color functions
+        f = open('./gym_env/additional_functions/new_color_functions.py', 'r')
+        temp = f.read()
+        f.close()
+
+        # time functions
+        f_t = open('./gym_env/additional_functions/time_functions.py', 'r')
+        temp_t = f_t.read()
+        f_t.close()
+    elif platform.system() == 'Linux':
+        # color functions
+        f = open('/gpfs/home6/lobianco/cpn-project/cpn/gym_env/additional_functions/new_color_functions.py', 'r')
+        temp = f.read()
+        f.close()
+
+        # time functions
+        f_t = open('/gpfs/home6/lobianco/cpn-project/cpn/gym_env/additional_functions/time_functions.py', 'r')
+        temp_t = f_t.read()
+        f_t.close()
+    else:
+        raise Exception("OS not supported")
+
 
     my_functions = temp + '\n' + temp_t
     pn = AEPetriNet(my_functions, observation_type='graph')
@@ -990,7 +1104,7 @@ if __name__ == "__main__":
         pn.add_place(Place("resources", tokens_attributes={"type": "int"}))
 
         pn.add_transition(TaggedTransition("arrive", tag='e', reward=0))
-        pn.add_transition(TaggedTransition("start", tag='a', reward="get_reward(case, resource)"))
+        pn.add_transition(TaggedTransition("start", tag='a', reward="get_reward"))
         #pn.add_transition(TaggedTransition("lose_order", tag='e', reward=0))
 
         pn.add_arc_by_ids("arrival", "arrive", "x")
@@ -1002,9 +1116,12 @@ if __name__ == "__main__":
         pn.add_arc_by_ids("start", "resources", "resource", time_expression=1)
 
         pn.add_mark_by_id("resources", {'type': 0}, 0)
-        pn.add_mark_by_id("resources", {'type': 1}, 0)
+        pn.add_mark_by_id("resources", {'type': 10}, 0)
         pn.add_mark_by_id("arrival", {'type': 0}, 0)
-        pn.add_mark_by_id("arrival", {'type': 1}, 0)
+        pn.add_mark_by_id("arrival", {'type': 10}, 0)
+
+
+
 
     if test_simulation:
         test_run = pn.simulation_run(1000)

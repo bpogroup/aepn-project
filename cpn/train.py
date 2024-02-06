@@ -12,7 +12,7 @@ import os
 
 import torch
 from torch_geometric.utils import scatter
-from torch_geometric.nn import GCNConv, GATConv, to_hetero, HANConv
+from torch_geometric.nn import GCNConv, GATConv, to_hetero, HANConv, GlobalAttention
 from torch_geometric.utils import softmax as pyg_softmax
 from torch.nn.functional import softmax
 
@@ -56,7 +56,7 @@ def make_parser():
                      help='discount rate')
     alg.add_argument('--lam',
                      type=float,
-                     default=0.97,
+                     default=0.99,
                      help='generalized advantage parameter')
     alg.add_argument('--eps',
                      type=float,
@@ -64,7 +64,7 @@ def make_parser():
                      help='clip ratio for clipped PPO')
     alg.add_argument('--c',
                      type=float,
-                     default=0.01,
+                     default=0.02,
                      help='KLD weight for penalty PPO')
     alg.add_argument('--ent_bonus',
                      type=float,
@@ -82,19 +82,19 @@ def make_parser():
                         help='policy network type')
     policy.add_argument('--policy_kwargs',
                         type=json.loads,
-                        default={"hidden_layers": [128]},
+                        default={"hidden_layers": [64]},
                         help='arguments to policy model constructor, passed through json.loads')
     policy.add_argument('--policy_lr',
                         type=float,
-                        default=1e-4,
+                        default=3e-3,#3e-4,
                         help='policy model learning rate')
     policy.add_argument('--policy_updates',
                         type=int,
-                        default=40,
+                        default=1, #40
                         help='policy model updates per epoch')
     policy.add_argument('--policy_kld_limit',
                         type=float,
-                        default=0.05, #0.01
+                        default=0.01, #0.01
                         help='KL divergence limit used for early stopping')
     policy.add_argument('--policy_weights',
                         type=str,
@@ -102,7 +102,7 @@ def make_parser():
                         help='filename for initial policy weights')
     policy.add_argument('--policy_network',
                         type=str,
-                        default="policy-500.pth",#"",
+                        default="",#"policy-500.pth",
                         help='filename for initial policy weights')
     policy.add_argument('--score',
                         type = lambda x: str(x).lower() == 'true',
@@ -120,15 +120,15 @@ def make_parser():
                        help='value network type')
     value.add_argument('--value_kwargs',
                        type=json.loads,
-                       default={"hidden_layers": [128]},
+                       default={"hidden_layers": [64]},
                        help='arguments to value model constructor, passed through json.loads')
     value.add_argument('--value_lr',
                        type=float,
-                       default=1e-3,
+                       default=3e-4,
                        help='the value model learning rate')
     value.add_argument('--value_updates',
                        type=int,
-                       default=40,
+                       default=10, #40
                        help='value model updates per epoch')
     value.add_argument('--value_weights',
                        type=str,
@@ -138,15 +138,15 @@ def make_parser():
     train = parser.add_argument_group('training')
     train.add_argument('--episodes',
                        type=int,
-                       default=10, #100
+                       default=64, #100
                        help='number of episodes per epoch')
     train.add_argument('--epochs',
                        type=int,
-                       default=50, #2500
+                       default=2500, #2500
                        help='number of epochs')
     train.add_argument('--max_episode_length',
                        type=lambda x: int(x) if x.lower() != 'none' else None,
-                       default=100, #500
+                       default=1, #500
                        help='max number of interactions per episode')
     train.add_argument('--batch_size',
                        type=lambda x: int(x) if x.lower() != 'none' else None,
@@ -160,6 +160,10 @@ def make_parser():
                        type=lambda x: str(x).lower() == 'true',
                        default=False,
                        help='whether to use a GPU if available')
+    train.add_argument('--load_policy_network',
+                       type=bool,
+                       default=False,
+                       help='wether to load a previously trained policy as starting point for this run')
     train.add_argument('--verbose',
                        type=int,
                        default=0,
@@ -180,7 +184,7 @@ def make_parser():
                        help='base directory for training runs')
     save.add_argument('--save_freq',
                        type=int,
-                       default=10,
+                       default=50,
                        help='how often to save the models')
 
     return parser
@@ -229,57 +233,64 @@ class Actor(ActorCritic):
 class HeteroActor(ActorCritic):
     def __init__(self, output_size, metadata):
         super(HeteroActor, self).__init__()
-        self.conv1 = HANConv(-1, 16, heads=1, metadata=metadata)  # 2 attention heads
+
+        self.conv1 = HANConv(-1, 16, heads=2, metadata=metadata)  # 2 attention heads
+        self.bn1 = nn.BatchNorm1d(16)  # Batch normalization after conv1
         self.conv2 = HANConv(16, output_size, metadata=metadata)  # we multiply by 2 due to the 2 attention heads
+        self.bn2 = nn.BatchNorm1d(output_size)  # Batch normalization after conv2
+        self.conv_unique = HANConv(-1, 1, heads=1, metadata=metadata)
+
 
     def forward(self, data):
         if 'graph' in data.keys():
             #x, metadata = data['graph'], data['graph'].metadata()
-            x = data['graph']
+            graph = data['graph']
         else:
-            x = data#data['x']
+            graph = data#data['x']
             #metadata = data['x'].metadata
-            index = data['transition']['batch']
+            index = data['a_transition']['batch']
             #index=data['transition'].batch
 
-        x_dict = x.x_dict
-        edge_index_dict = x.edge_index_dict
 
-        #import pdb; pdb.set_trace()
-        x_dict = self.conv1(x_dict, edge_index_dict)#, edge_index).relu()
-        x_dict = {k: F.relu(v) for k, v in x_dict.items() if v is not None}
-        x_dict = self.conv2(x_dict, edge_index_dict)#, edge_index)
+        x_dict = graph.x_dict
+        #print(x_dict)
+        edge_index_dict = graph.edge_index_dict
+        #print(edge_index_dict)
+
+        #x_dict = self.conv1(x_dict, edge_index_dict)#, edge_index).relu()
+        #x_dict = {k: self.bn1(F.relu(v)) for k, v in x_dict.items() if v is not None}
+        #x_dict = self.conv2(x_dict, edge_index_dict)#, edge_index)
+        #x_dict = {k: self.bn2(v) for k, v in x_dict.items() if v is not None}
+        #x_dict = self.pool(x_dict, edge_index_dict)
+
+        x_dict = self.conv_unique(x_dict, edge_index_dict)
+
         if 'graph' in data.keys():
             if 'mask' in data.keys():
-                mask = data['mask']['transition'].x
+                mask = data['mask']['a_transition'].x
                 mask = mask.masked_fill(mask == 0, float('-inf'))
                 mask = mask.masked_fill(mask == 1, 0)
                 #mask brings the values to -inf if the action is not valid
 
-                #import pdb; pdb.set_trace()
                 #x_dict's transition node is brought to -inf if the action is not valid
-                x_dict['transition'] = x_dict['transition'] + mask
+                x_dict['a_transition'] = x_dict['a_transition'] + mask
 
             #x_dict = {k: softmax(v, dim=0) for k, v in x_dict.items() if v is not None}
-            x_dict = softmax(x_dict['transition'], dim=0)
-        else:
-            #x_dict = {k: pyg_softmax(v, index) for k, v in x_dict.items() if v is not None}
             #import pdb; pdb.set_trace()
-            x_dict = pyg_softmax(x_dict['transition'], index)
+            x_dict = softmax(x_dict['a_transition'], dim=0)
+
+            #print the index of the highest value in the tensor
+            print(f"Action expected: {int(torch.argmax(x_dict))}")
+            print(f"Action probabilities: {x_dict}")
+        else:
+            mask = data['mask']
+            mask = mask.masked_fill(mask == 0, float('-inf'))
+            mask = mask.masked_fill(mask == 1, 0)
+            x_dict['a_transition'] = x_dict['a_transition'] + mask
+            x_dict = pyg_softmax(x_dict['a_transition'], index)
         return x_dict
 
-    def reset_parameters(self):
-        self.conv1.reset_parameters()
-        self.conv2.reset_parameters()
-
-        # Initialize parameters with the correct dimensions (TODO: make it authomatic)
-        self.conv1.proj.arrival.weight = torch.nn.Parameter(torch.empty(16, 2))
-        self.conv1.proj.waiting.weight = torch.nn.Parameter(torch.empty(16, 2))
-        self.conv1.proj.resources.weight = torch.nn.Parameter(torch.empty(16, 4))
-        self.conv1.proj.busy.weight = torch.nn.Parameter(torch.empty(16, 5))
-        self.conv1.proj.transition.weight = torch.nn.Parameter(torch.empty(16, 1))
-
-
+import torch.nn.functional as F
 class HeteroCritic(ActorCritic):
     def __init__(self, output_size, metadata):
         super(HeteroCritic, self).__init__()
@@ -293,14 +304,14 @@ class HeteroCritic(ActorCritic):
             x, metadata = data['graph'], data['graph'].metadata()
         else:
             x = data
-            index = data['transition']['batch']
+            index = data['a_transition']['batch']
 
 
         x_dict = x.x_dict
         edge_index_dict = x.edge_index_dict
 
         x_dict = self.conv1(x_dict, edge_index_dict)#, edge_index).relu()
-        x_dict = {k: F.relu(v) for k, v in x_dict.items() if v is not None}
+        #x_dict = {k: F.relu(v) for k, v in x_dict.items() if v is not None}
         if 'graph' in data.keys():
             #TODO: action masking
             #import pdb; pdb.set_trace()
@@ -309,7 +320,7 @@ class HeteroCritic(ActorCritic):
 
         else:
             #x_dict = {k: scatter(v, index, dim=0, reduce='sum') for k, v in x_dict.items() if v is not None}
-            x_dict = scatter(x_dict['transition'], index, dim=0, reduce='sum')
+            x_dict = scatter(x_dict['a_transition'], index, dim=0, reduce='sum')
             x = x_dict
 
         x = self.lin(x)
@@ -362,11 +373,14 @@ def make_env(args, aepn = None):
 def make_policy_network(args, metadata=None):
     """Return the policy network for this run."""
     if args.environment == 'ActionEvolutionPetriNetEnv':
-        policy_network = HeteroActor(1, metadata=metadata)
+        if args.load_policy_network:
+            policy_network = torch.load(os.path.join(os.getcwd(), args.logdir, args.name, args.policy_network))
+        else:
+            policy_network = HeteroActor(1, metadata=metadata)
     else:
         raise Exception("Unknown environment! Are you sure it is spelled correctly?")
-    if args.policy_weights != "":
-        policy_network.load_weights(os.path.join(args.logdir, args.name, args.policy_weights))
+    #if args.policy_weights != "":
+    #    policy_network.load_weights(os.path.join(args.logdir, args.name, args.policy_weights))
     return policy_network
 
 

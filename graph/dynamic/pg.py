@@ -600,6 +600,8 @@ class Agent:
             logprobs = batch.logprobs.clone()
             advantages = batch.reward.clone()
 
+
+
         logpis = self.policy_model(states).log()
         new_logprobs = torch.stack([logpis[indexes == index][actions[index]] for index in indexes.unique()]).squeeze(1)
         probs = torch.exp(new_logprobs)

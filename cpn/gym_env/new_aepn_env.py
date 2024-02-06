@@ -18,7 +18,6 @@ class AEPN_Env(Env):
 		graph = obs['graph']
 		mask = obs['mask']
 		actions = obs['actions_dict']
-
 		print(graph)
 
 		self.pn_actions = actions #retrieve the color sets of places incoming to actions transitions
@@ -28,6 +27,7 @@ class AEPN_Env(Env):
 		self.action_space = spaces.Discrete(len(mask))
 
 		# Define the observation space
+		# TODO: make it usable with both graph and vector observations
 		self.observation_space = spaces.Dict(
 			{
 				'graph': spaces.Box(low=0, high=1, shape=(1,)),#spaces.Graph(node_space=spaces.Box(low=0, high=1, shape=(1,)), edge_space=None)
@@ -49,7 +49,8 @@ class AEPN_Env(Env):
 		old_clock = self.pn.clock
 
 		#import pdb; pdb.set_trace()
-		observation, loc_i = self.pn.apply_action(self.pn_actions[action])
+		binding = self.pn_actions[action]
+		observation, loc_i = self.pn.apply_action(binding)
 
 		self.i += loc_i
 		terminated = False
@@ -60,13 +61,15 @@ class AEPN_Env(Env):
 
 		self.pn_actions = observation['actions_dict']
 
-		reward = (self.pn.rewards - old_rewards)/(1+(self.pn.clock - old_clock))
-		
+		reward = (self.pn.rewards - old_rewards)#/(1+(self.pn.clock - old_clock))
+
+
+		print(f"Action taken: {action}, corresponding to binding: {binding}, generated reward: {reward}")
 		info = {'pn_reward' : self.pn.rewards}
 		return observation, reward, terminated, False, info
 
 	def reset(self):
-		print("Entered reset \n")
+		print(f"Entered reset with current reward for PN: {self.pn.rewards} \n")
 		#return observation = [], info = {}
 		self.pn = copy.deepcopy(self.frozen_pn)
 		self.pn.get_to_first_action()

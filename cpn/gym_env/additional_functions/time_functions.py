@@ -1,3 +1,6 @@
+import random
+
+
 def get_compatibility(case, resource):
     """
     Sets the resource's compatibilities
@@ -10,3 +13,11 @@ def get_compatibility(case, resource):
         raise Exception('Task type not recognized')
 
     return increment
+
+def exponential_mean(x):
+    mean = x['average_interarrival_time']
+    return random.expovariate(1/mean)
+
+def randomize_completion_time(case, resource):
+
+    return resource['average_completion_time'] #not random for now

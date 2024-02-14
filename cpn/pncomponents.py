@@ -210,6 +210,7 @@ class TimeIncreasingArc(Arc):
         self.rng = default_rng()
 
     def increment_time(self, token, clock):
+        import pdb; pdb.set_trace()
         if self.increment == None:
             raise Exception(f"No increment was provided on arc {self}")
         elif type(self.increment) == int:  # integer increment
@@ -284,3 +285,74 @@ class Color(AbstractColor):
             except:
                 raise Exception(f"Attribute {k} of color {self} cannot be converted to torch.tensor.")
         return ret_dict
+
+
+
+class ClockWrapper:
+    """
+    Wrapper for numeric values to make them mutable.
+    This is used to pass the clock from the PN to the function dispatcher, so that the clock can be updated seamlessly.
+    """
+
+    def __init__(self, value):
+        self.value = value
+
+    def __add__(self, other):
+        if isinstance(other, ClockWrapper):
+            return ClockWrapper(self.value + other.value)
+        else:
+            return ClockWrapper(self.value + other)
+
+    def __sub__(self, other):
+        if isinstance(other, ClockWrapper):
+            return ClockWrapper(self.value - other.value)
+        else:
+            return ClockWrapper(self.value - other)
+
+    def __mul__(self, other):
+        if isinstance(other, ClockWrapper):
+            return ClockWrapper(self.value * other.value)
+        else:
+            return ClockWrapper(self.value * other)
+
+    def __truediv__(self, other):
+        if isinstance(other, ClockWrapper):
+            return ClockWrapper(self.value / other.value)
+        else:
+            return ClockWrapper(self.value / other)
+
+    def __eq__(self, other):
+        if isinstance(other, ClockWrapper):
+            return self.value == other.value
+        else:
+            return self.value == other
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __lt__(self, other):
+        if isinstance(other, ClockWrapper):
+            return self.value < other.value
+        else:
+            return self.value < other
+
+    def __le__(self, other):
+        if isinstance(other, ClockWrapper):
+            return self.value <= other.value
+        else:
+            return self.value <= other
+
+    def __gt__(self, other):
+        if isinstance(other, ClockWrapper):
+            return self.value > other.value
+        else:
+            return self.value > other
+
+    def __ge__(self, other):
+        if isinstance(other, ClockWrapper):
+            return self.value >= other.value
+        else:
+            return self.value >= other
+
+    def __str__(self):
+        return str(self.value)

@@ -1,6 +1,7 @@
 import json
 import numpy as np
-
+import math
+import random
 
 def check_compatibility(c1, c2):
     c1 = c1.split(';')
@@ -165,30 +166,65 @@ def is_not_set(resource):
     """
     Checks if the dummy resource is not set
     """
+    #import pdb; pdb.set_trace()
     return not bool(resource['is_set'])
 
 def set_compatibility(resource):
     """
     Sets the resource's compatibilities
     """
-    if resource['id']==0:
-        resource['compatibility_0'] = 1
-        resource['compatibility_1'] = 10
-    elif resource['id']==1:
-        resource['compatibility_0'] = 10
-        resource['compatibility_1'] = 1
+    if resource['type']==0:
+        #generate a random compatibility
+        resource['compatibility_0'] = 1 + np.random.randint(2)
+        resource['compatibility_1'] = 3 + np.random.randint(2)
+    elif resource['type']==1:
+        resource['compatibility_0'] = 3 + np.random.randint(2)
+        resource['compatibility_1'] = 1 + np.random.randint(2)
 
     resource['is_set'] = True
-    return {'id': resource['id'], 'compatibility_0': resource['compatibility_0'], 'compatibility_1': resource['compatibility_1'], 'is_set': resource['is_set']}
+    return {'type': resource['type'], 'compatibility_0': resource['compatibility_0'], 'compatibility_1': resource['compatibility_1'], 'is_set': resource['is_set']}
 
 def new_combine(case, resource):
-    return {'resource_id': resource['id'], 'task_id': case['id'], 'task_type': case['type'], 'compatibility_0': resource['compatibility_0'], 'compatibility_1' : resource['compatibility_1']}
+    return {'resource_type': resource['type'], 'task_type': case['type'], 'compatibility_0': resource['compatibility_0'], 'compatibility_1' : resource['compatibility_1']}
 
 def new_split(case_resource):
-    return {'id':case_resource['resource_id'], 'compatibility_0': case_resource['compatibility_0'], 'compatibility_1': case_resource['compatibility_1'], 'is_set': False}
+    return {'type': case_resource['resource_type'], 'compatibility_0': case_resource['compatibility_0'], 'compatibility_1': case_resource['compatibility_1'], 'is_set': False}
 
 def get_reward(case, resource):
     if case['type'] == resource['type']:
         return 10
     else:
         return 0
+
+
+def get_budget(case_resource):
+    return case_resource['budget']
+
+def is_late(case):
+    return case['patience'] <= 0
+
+def is_not_late(case):
+    return case['patience'] > 0
+
+def get_patience(case):
+    return case['patience']
+
+def update_patience(case):
+    case['patience'] -= 1
+    return case
+
+def combine_budget(case, resource):
+    return {'resource_average_completion_time': resource['average_completion_time'], 'budget': case['budget']}
+
+def get_resource(case_resource):
+    return {'average_completion_time': case_resource['resource_average_completion_time']}
+
+def randomize_budget_and_patience(CLOCK, x):
+    mu = 100  # Mean budget
+    sigma = 10  # Standard deviation budget
+    x['budget'] = math.ceil(random.gauss(mu, sigma)) #budget is an integer
+
+    x['patience'] = CLOCK + random.expovariate(1/2) #the interarrival time is 1, so the patience should be on average less than the arrivals
+    x['arrival_time'] = CLOCK
+
+    return x

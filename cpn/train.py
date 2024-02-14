@@ -90,7 +90,7 @@ def make_parser():
                         help='policy model learning rate')
     policy.add_argument('--policy_updates',
                         type=int,
-                        default=1, #40
+                        default=10, #40
                         help='policy model updates per epoch')
     policy.add_argument('--policy_kld_limit',
                         type=float,
@@ -146,7 +146,7 @@ def make_parser():
                        help='number of epochs')
     train.add_argument('--max_episode_length',
                        type=lambda x: int(x) if x.lower() != 'none' else None,
-                       default=1, #500
+                       default=100, #500
                        help='max number of interactions per episode')
     train.add_argument('--batch_size',
                        type=lambda x: int(x) if x.lower() != 'none' else None,
@@ -241,6 +241,7 @@ class HeteroActor(ActorCritic):
         self.conv_unique = HANConv(-1, 1, heads=1, metadata=metadata)
 
 
+
     def forward(self, data):
         if 'graph' in data.keys():
             #x, metadata = data['graph'], data['graph'].metadata()
@@ -264,6 +265,10 @@ class HeteroActor(ActorCritic):
         #x_dict = self.pool(x_dict, edge_index_dict)
 
         x_dict = self.conv_unique(x_dict, edge_index_dict)
+
+        # Pass through decoder
+        #x_dict = F.relu(self.fc1(x_dict))
+        #x_dict = self.fc2(x_dict)
 
         if 'graph' in data.keys():
             if 'mask' in data.keys():
@@ -393,7 +398,7 @@ def make_value_network(args, metadata=None):
     else:
         raise Exception("Unknown environment! Are you sure it is spelled correctly?")
     if args.value_weights != "":
-        value_network.load_weights(args.value_weights)
+        value_network.load_weights(os.path.join(os.getcwd(), args.logdir, args.name, args.value_weights))
     return value_network
 
 

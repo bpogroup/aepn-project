@@ -5,13 +5,15 @@
 #     """
 
 import importlib
+import inspect
 
 class FunctionDispatcher:
 #    def __init__(self):
 #        self.functions = color_functions
 #        self.time_functions = time_functions
 
-    def __init__(self, module_names):
+    def __init__(self, module_names, clock):
+        self.clock = clock
         self.commands = {}
         for module_name in module_names:
             module = importlib.import_module(module_name)
@@ -20,12 +22,15 @@ class FunctionDispatcher:
                 if callable(attr):
                     self.commands[attr_name] = attr
 
-    def dispatch(self, command_name, **args):
+    def dispatch(self, command_name, clock=None, **args):
         #import pdb; pdb.set_trace()
         if command_name in args.keys():
             return args[command_name] #if the input identity function
         elif command_name in self.commands:
-            return self.commands[command_name](**args)
+            if inspect.getfullargspec(self.commands[command_name]).args[0] == 'CLOCK': #if the function has a clock argument
+                return self.commands[command_name](self.clock.value, **args)
+            else:
+                return self.commands[command_name](**args)
         else:
             raise Exception(f"Function {command_name} not found in available functions: {self.commands.keys()}")
 
@@ -34,7 +39,7 @@ class FunctionDispatcher:
 
 if __name__ == "__main__":
     #test the FunctionDispatcher class
-    f = FunctionDispatcher(['new_color_functions', 'time_functions'])
+    f = FunctionDispatcher(['new_color_functions', 'time_functions'], 0)
     print('test')
     for func in f.get_commands():
         print(func)

@@ -10,14 +10,14 @@ import torch
 #from stable_baselines3.common.logger import configure
 import copy
 import time
-from torch_geometric.data import HeteroData, Data
+from torch_geometric.data import HeteroData
 
 from train import make_parser, make_env, make_agent, make_logdir
 
 try:
     from .gym_env.additional_functions.function_dispatcher import FunctionDispatcher
     from .gym_env import new_aepn_env as aepn_env
-    from .pncomponents import Transition, TaggedTransition, Place, Token, Arc
+    from .pncomponents import Transition, TaggedTransition, Place, Token, Arc, ClockWrapper
     from .gym_env.additional_functions.new_color_functions import *
     from .gym_env.additional_functions.time_functions import *
     from .gym_env.additional_functions import new_color_functions
@@ -25,7 +25,7 @@ try:
 except:
     from gym_env.additional_functions.function_dispatcher import FunctionDispatcher
     from gym_env import new_aepn_env
-    from pncomponents import Transition, TaggedTransition, Place, Token, Arc
+    from pncomponents import Transition, TaggedTransition, Place, Token, Arc, ClockWrapper
     from gym_env.additional_functions.new_color_functions import *
     from gym_env.additional_functions.time_functions import *
     from gym_env.additional_functions import new_color_functions
@@ -59,7 +59,7 @@ class PetriNet(AbstractPetriNet):
         self.places = []
         self.transitions = []
         self.arcs = []
-        self.clock = 0
+        self.clock = ClockWrapper(0)
 
         self.additional_functions = additional_functions
         if not additional_functions.endswith("\n"):
@@ -239,16 +239,20 @@ class PetriNet(AbstractPetriNet):
                     #import pdb; pdb.set_trace()
                     time = token.time
             if enabled and transition.guard is not None:  # if the transition has a guard, that guard must evaluate to True with the given variable binding
+                #import pdb; pdb.set_trace()
                 #TODO: check if it works
-                exec(self.compiled, variable_values)  # execute the compiled code
-                exec("result = " + transition.guard, variable_values)  # evaluate the guard
+                dispatcher_result = self.dispatcher.dispatch(transition.guard, **variable_values)
+                enabled = dispatcher_result
+
+                #exec(self.compiled, variable_values)  # execute the compiled code
+                #exec("result = " + transition.guard, variable_values)  # evaluate the guard
                 #exec(compile(self.additional_functions + "result = " + transition.guard, "<string>", "exec"), variable_values)
-                enabled = variable_values['result']
+                #enabled = variable_values['result']
             if enabled:
                 result.append((binding, time))
             if not enabled:
-                print(f"Binding {binding} is not enabled")
-        #import pdb; pdb.set_trace()
+                #print(f"Binding {binding} is not enabled")
+                pass
         return result
 
     def bindings(self):
@@ -333,9 +337,9 @@ class AEPetriNet(PetriNet):
         super().__init__(additional_functions)
 
         if platform.system() == 'Windows':
-            self.dispatcher = FunctionDispatcher(["cpn.gym_env.additional_functions.new_color_functions", "cpn.gym_env.additional_functions.time_functions"])
+            self.dispatcher = FunctionDispatcher(["cpn.gym_env.additional_functions.new_color_functions", "cpn.gym_env.additional_functions.time_functions"], clock = self.clock)
         elif platform.system() == 'Linux':
-            self.dispatcher = FunctionDispatcher(["gym_env.additional_functions.new_color_functions", "gym_env.additional_functions.time_functions"])
+            self.dispatcher = FunctionDispatcher(["gym_env.additional_functions.new_color_functions", "gym_env.additional_functions.time_functions"], clock = self.clock)
 
         self.actions_dict = None
         self.rewards = 0
@@ -436,12 +440,11 @@ class AEPetriNet(PetriNet):
             if arc.time_expression is not None:  # if the transition has a time expression
                 #exec(compile(self.additional_functions + "result = " + str(arc.time_expression), "<string>", "exec"), variable_assignment)
                 if isinstance(arc.time_expression, (int, float, complex)):
-                    variable_assignment['result'] = arc.time_expression
+                    token.time = self.clock + arc.time_expression
                 else:
                     dispatcher_result = self.dispatcher.dispatch(arc.time_expression, **variable_assignment)
-                    token.color = dispatcher_result
+                    token.time = self.clock + dispatcher_result
 
-                token.time = self.clock + variable_assignment['result']
             arc.dst.add_token(token)
 
         self.update_reward(timed_binding)
@@ -530,7 +533,7 @@ class AEPetriNet(PetriNet):
                             #exec(compile(self.additional_functions + "result = " + t.guard, "<string>", "exec"),
                             #     variable_values)
                             #enabled = variable_values['result']
-                            dispatcher_result = self.dispatcher.dispatch(t.guard, variable_values)
+                            dispatcher_result = self.dispatcher.dispatch(t.guard, **variable_values)
                             enabled = dispatcher_result
 
                             if enabled: color_associations.append(v_v_original)
@@ -565,7 +568,8 @@ class AEPetriNet(PetriNet):
                             #exec(compile(self.additional_functions + "result = " + t.guard, "<string>", "exec"),
                             #     variable_values)
                             #enabled = variable_values['result']
-                            dispatcher_result = self.dispatcher.dispatch(t.guard, variable_values)
+                            dispatcher_result = self.dispatcher.dispatch(t.guard, **variable_values)
+                            print("Got here")
                             enabled = dispatcher_result
                             if enabled: color_associations.append(v_v_original)
                         else:
@@ -580,6 +584,7 @@ class AEPetriNet(PetriNet):
             Return a list of all the available actions in the form of list of nodes indexes in the graph corresponding to
             the petri net
             """
+            import pdb; pdb.set_trace()
             return self.actions_dict
         else:
             raise Exception("Invalid value for parameter obs_type")
@@ -674,8 +679,8 @@ class AEPetriNet(PetriNet):
 
                             a_transition_dict[t._id] = i
 
-
-                    mask_graph[n_t].x = torch.stack(t_nodes_mask)
+                    if t_nodes_mask:
+                        mask_graph[n_t].x = torch.stack(t_nodes_mask)
                     nodes = t_nodes
                 else:
                     e_transition_dict = {}  # helper to keep track of the transitions indexes in the graph
@@ -698,8 +703,9 @@ class AEPetriNet(PetriNet):
                         # If yes, stack the new nodes to the existing ones
                         ret_graph[n_t].x = torch.cat((ret_graph[n_t].x, torch.stack(nodes)), dim=1)
                 else:
-                    ret_graph[n_t].x = torch.empty(0, len(
-                        self.by_id[n_t].tokens_attributes.keys()))  # create empty placeholder of the right size
+                    if n_t not in ['a_transition', 'e_transition']:
+                        ret_graph[n_t].x = torch.empty(0, len(
+                            self.by_id[n_t].tokens_attributes.keys()))  # create empty placeholder of the right size
 
 
             #import pdb; pdb.set_trace()
@@ -745,19 +751,22 @@ class AEPetriNet(PetriNet):
                             ret_graph[key].edge_index = torch.cat((ret_graph[key].edge_index, new_values), dim=1)
 
                     #TODO: verify this is not necessary
-                    #for place in self.places: #create empyty placeholders for arcs that are not represented in the expanded network
+                    for place in self.places: #create empyty placeholders for arcs that are not represented in the expanded network
+                        if not ret_graph['a_transition', 'edge', place._id]:
+                            ret_graph['a_transition', 'edge', place._id].edge_index = torch.empty(2, 0).type(torch.int64)
+                            mask_graph['a_transition', 'edge', place._id].edge_index = torch.empty(2, 0).type(torch.int64)
+                        if not ret_graph[place._id, 'edge', 'a_transition']:
+                            ret_graph[place._id, 'edge', 'a_transition'].edge_index = torch.empty(2, 0).type(torch.int64)
+                            mask_graph[place._id, 'edge', 'a_transition'].edge_index = torch.empty(2, 0).type(torch.int64)
+                        if not ret_graph['e_transition', 'edge', place._id]:
+                            ret_graph['e_transition', 'edge', place._id].edge_index = torch.empty(2, 0).type(torch.int64)
+                            mask_graph['e_transition', 'edge', place._id].edge_index = torch.empty(2, 0).type(torch.int64)
+                        if not ret_graph[place._id, 'edge', 'e_transition']:
+                            ret_graph[place._id, 'edge', 'e_transition'].edge_index = torch.empty(2, 0).type(torch.int64)
+                            mask_graph[place._id, 'edge', 'e_transition'].edge_index = torch.empty(2, 0).type(torch.int64)
 
-                    #    if not ret_graph['transition', 'edge', place._id]:
-                    #        ret_graph['transition', 'edge', place._id].edge_index = torch.empty(2, 0).type(torch.int64)
-                    #        mask_graph['transition', 'edge', place._id].edge_index = torch.empty(2, 0).type(torch.int64)
-                    #    if not ret_graph[place._id, 'edge', 'transition']:
-                    #        ret_graph[place._id, 'edge', 'transition'].edge_index = torch.empty(2, 0).type(torch.int64)
-                    #        mask_graph[place._id, 'edge', 'transition'].edge_index = torch.empty(2, 0).type(torch.int64)
-
-                    #import pdb; pdb.set_trace()
                     #print("Added missing edges")
 
-            #import pdb; pdb.set_trace()
             #print(ret_graph)
             self.actions_dict = pn_bindings
             return {'graph': ret_graph, 'mask': mask_graph, 'actions_dict': pn_bindings}
@@ -917,20 +926,11 @@ class AEPetriNet(PetriNet):
         if not os.path.exists(out_folder_name):
             os.makedirs(out_folder_name)
             os.makedirs(log_dir)
-            
-        #if load_model:
-        #    model = MaskablePPO.load(out_path, env, n_steps = 50)
-        #else:
-        #    model = MaskablePPO(MaskableActorCriticPolicy, env, n_steps = 50, verbose=1)
-        
-        ##model.set_logger(configure(log_dir, ["stdout", "csv", "tensorboard"]))
-        #model.learn(total_timesteps=num_steps)
-        #env.reset()
-        #model.save(out_path)
 
         print("Training over")
 
-    def new_training_run(self, test=False):
+    def new_training_run(self, length = 1000, test=False):
+        self.length = length
         args = make_parser().parse_args()
         if not args.use_gpu:
             os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -1029,12 +1029,16 @@ class AEPetriNet(PetriNet):
 if __name__ == "__main__":
     test_cpn = False #test standard cpn implementation
 
-    test_simple_aepn = True #test a simple aepn for testing purposes
+    test_simple_aepn = False #test a simple aepn for testing purposes
     test_task_assignment = False #test a-e cpn for task assignment problem
-    
+    test_consulting_firm = True
+
     test_simulation = False
     test_training = True
     test_inference = False
+
+    #maximum value of self.clock
+    max_length = 10
 
     import platform
 
@@ -1067,13 +1071,13 @@ if __name__ == "__main__":
 
     if test_task_assignment:
 
-        pn.add_place(Place("arrival", tokens_attributes={"id": "int", "type": "int"})) #attribute TIME is always added by default
-        pn.add_place(Place("waiting", tokens_attributes={"id": "int", "type": "int"}))
-        pn.add_place(Place("resources", tokens_attributes={"id": "int", "compatibility_0": "int", "compatibility_1": "int", "is_set": "int"}))
-        pn.add_place(Place("busy", tokens_attributes={'resource_id': 'int', 'task_id': 'int', 'task_type': 'int', 'compatibility_0': 'int', 'compatibility_1': 'int'}))
+        pn.add_place(Place("arrival", tokens_attributes={"type": "int"})) #attribute TIME is always added by default
+        pn.add_place(Place("waiting", tokens_attributes={"type": "int"}))
+        pn.add_place(Place("resources", tokens_attributes={"type": "int", "compatibility_0": "int", "compatibility_1": "int", "is_set": "int"}))
+        pn.add_place(Place("busy", tokens_attributes={'resource_type': 'int', 'task_type': 'int', 'compatibility_0': 'int', 'compatibility_1': 'int'}))
 
         pn.add_transition(TaggedTransition("arrive", tag='e', reward=0))
-        pn.add_transition(TaggedTransition("set_compatibility", guard="is_not_set(res)", tag='e', reward=0))
+        pn.add_transition(TaggedTransition("set_compatibility", guard="is_not_set", tag='e', reward=0))
         pn.add_transition(TaggedTransition("start", tag='a', reward=0))
         pn.add_transition(TaggedTransition("complete", tag='e', reward=1))
 
@@ -1081,20 +1085,20 @@ if __name__ == "__main__":
         pn.add_arc_by_ids("arrive", "arrival", "x", time_expression=1)
         pn.add_arc_by_ids("arrive", "waiting", "x", time_expression=0)
 
-        pn.add_arc_by_ids("resources", "set_compatibility", "res")
-        pn.add_arc_by_ids("set_compatibility", "resources", "set_compatibility(res)")
+        pn.add_arc_by_ids("resources", "set_compatibility", "resource")
+        pn.add_arc_by_ids("set_compatibility", "resources", "set_compatibility", time_expression=0)
 
         pn.add_arc_by_ids("resources", "start", "resource")
         pn.add_arc_by_ids("waiting", "start", "case")
-        pn.add_arc_by_ids("start", "busy", "new_combine(case, resource)", time_expression="get_compatibility(case, resource)")
+        pn.add_arc_by_ids("start", "busy", "new_combine", time_expression="get_compatibility")
 
         pn.add_arc_by_ids("busy", "complete", "case_resource")
-        pn.add_arc_by_ids("complete", "resources", "new_split(case_resource)", time_expression=0)
+        pn.add_arc_by_ids("complete", "resources", "new_split", time_expression=0)
 
-        pn.add_mark_by_id("resources", {'id': 0, 'compatibility_0': 0, 'compatibility_1': 1, 'is_set': 0}, 0)
-        pn.add_mark_by_id("resources", {'id': 1, 'compatibility_0': 1, 'compatibility_1': 0, 'is_set': 0}, 0)
-        pn.add_mark_by_id("arrival", {'id': 0, 'type': 0}, 0)
-        pn.add_mark_by_id("arrival", {'id': 1, 'type': 1}, 0)
+        pn.add_mark_by_id("resources", {'type': 0, 'compatibility_0': 1, 'compatibility_1': 1, 'is_set': 0}, 0)
+        pn.add_mark_by_id("resources", {'type': 1, 'compatibility_0': 1, 'compatibility_1': 1, 'is_set': 0}, 0)
+        pn.add_mark_by_id("arrival", {'type': 0}, 0)
+        pn.add_mark_by_id("arrival", {'type': 1}, 0)
 
     #print(pn)
     elif test_simple_aepn:
@@ -1120,6 +1124,36 @@ if __name__ == "__main__":
         pn.add_mark_by_id("arrival", {'type': 0}, 0)
         pn.add_mark_by_id("arrival", {'type': 10}, 0)
 
+    elif test_consulting_firm:
+
+        pn.add_place(Place("arrival", tokens_attributes={"average_interarrival_time": "int"})) #attribute TIME is always added by default
+        pn.add_place(Place("waiting", tokens_attributes={"budget": "int", "arrival_time": "int", "patience": "int"})) #TODO: make "patience" unobservable
+        pn.add_place(Place("resources", tokens_attributes={"average_completion_time": "int"}))
+        pn.add_place(Place("busy", tokens_attributes={'resource_average_completion_time': 'int', 'task_type': 'int', 'budget': 'int'}))
+
+        pn.add_transition(TaggedTransition("arrive", tag='e', reward=0))
+        pn.add_transition(TaggedTransition("start", tag='a', reward=0))
+        pn.add_transition(TaggedTransition("complete", tag='e', reward='get_budget'))
+        pn.add_transition(TaggedTransition("lose_order", tag='e', reward=0, guard="is_late"))
+        #pn.add_transition(TaggedTransition("decrement_patience", tag='e', reward=0, guard="is_not_late"))
+
+        pn.add_arc_by_ids("arrival", "arrive", "x")
+        pn.add_arc_by_ids("arrive", "arrival", "x", time_expression='exponential_mean')
+        pn.add_arc_by_ids("arrive", "waiting", "randomize_budget_and_patience", time_expression=0)
+
+        pn.add_arc_by_ids("waiting", "lose_order", "case")
+
+        pn.add_arc_by_ids("resources", "start", "resource")
+        pn.add_arc_by_ids("waiting", "start", "case")
+        pn.add_arc_by_ids("start", "busy", "combine_budget", time_expression="randomize_completion_time") #for now, the randomization is not done and the average time is considered
+
+        pn.add_arc_by_ids("busy", "complete", "case_resource")
+        pn.add_arc_by_ids("complete", "resources", "get_resource", time_expression=0)
+
+        pn.add_mark_by_id("resources", {'average_completion_time': 2}, 0)
+        #pn.add_mark_by_id("resources", {'average_completion_time': 3}, 0)
+        pn.add_mark_by_id("arrival", {'average_interarrival_time': 1}, 0)
+
 
 
 
@@ -1130,7 +1164,7 @@ if __name__ == "__main__":
 
     elif test_training:
         start_time = time.time()
-        pn.new_training_run(test_inference)
+        pn.new_training_run(max_length, test_inference)
         print("TRAINING TIME: --- %s seconds ---" % (time.time() - start_time))
 
     elif test_inference:

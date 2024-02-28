@@ -64,7 +64,7 @@ class AEPN_Env(Env):
 		reward = (self.pn.rewards - old_rewards)#/(1+(self.pn.clock - old_clock))
 
 
-		print(f"Action taken: {action}, corresponding to binding: {binding}, generated reward: {reward}")
+		#print(f"Action taken: {action}, corresponding to binding: {binding}, generated reward: {reward}")
 		info = {'pn_reward' : self.pn.rewards}
 		return observation, reward, terminated, False, info
 
@@ -84,7 +84,3 @@ class AEPN_Env(Env):
 		valid_actions = [True if i in v_a else False for i in self.pn_actions]
 		self.valid_actions = valid_actions
 		return valid_actions
-
-
-    
-        

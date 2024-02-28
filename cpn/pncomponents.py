@@ -233,6 +233,7 @@ class Token:
     def __init__(self, color, time=None):
         self.color = color
         self.time = time
+        #import pdb; pdb.set_trace()
 
     def __eq__(self, token):
         return self.color == token.color and self.time == token.time
@@ -241,7 +242,7 @@ class Token:
         return (self.color, self.time) < (token.color, token.time)
 
     def __hash__(self):
-        return (self.color, self.time).__hash__()
+        return (self.color, float(self.time)).__hash__() #MODIFIED for backward compatibility
 
     def __str__(self):
         result = str(self.color)
@@ -356,3 +357,9 @@ class ClockWrapper:
 
     def __str__(self):
         return str(self.value)
+
+    def __float__(self):
+        return float(self.value)
+
+    def __repr__(self):
+        return self.__str__()

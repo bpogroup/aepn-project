@@ -86,7 +86,7 @@ def make_parser():
                         help='arguments to policy model constructor, passed through json.loads')
     policy.add_argument('--policy_lr',
                         type=float,
-                        default=3e-3,#3e-4,
+                        default=3e-2,#3e-4,
                         help='policy model learning rate')
     policy.add_argument('--policy_updates',
                         type=int,
@@ -234,65 +234,48 @@ class HeteroActor(ActorCritic):
     def __init__(self, output_size, metadata):
         super(HeteroActor, self).__init__()
 
-        self.conv1 = HANConv(-1, 16, heads=2, metadata=metadata)  # 2 attention heads
-        self.bn1 = nn.BatchNorm1d(16)  # Batch normalization after conv1
-        self.conv2 = HANConv(16, output_size, metadata=metadata)  # we multiply by 2 due to the 2 attention heads
-        self.bn2 = nn.BatchNorm1d(output_size)  # Batch normalization after conv2
-        self.conv_unique = HANConv(-1, 1, heads=1, metadata=metadata)
+        # Encoder: HANConv layer
+        self.encoder = HANConv(-1, output_size, heads=1, metadata=metadata)
 
-
+        # Decoder: MLP with a 1-dimensional output
+        self.decoder = nn.Sequential(
+            nn.Linear(output_size, 64),
+            nn.ReLU(),
+            nn.Linear(64, 1),
+            #nn.ReLU(),
+            #nn.Linear(32, 1)
+        )
 
     def forward(self, data):
         if 'graph' in data.keys():
-            #x, metadata = data['graph'], data['graph'].metadata()
             graph = data['graph']
         else:
-            graph = data#data['x']
-            #metadata = data['x'].metadata
+            graph = data
             index = data['a_transition']['batch']
-            #index=data['transition'].batch
-
 
         x_dict = graph.x_dict
-        #print(x_dict)
         edge_index_dict = graph.edge_index_dict
-        #print(edge_index_dict)
 
-        #x_dict = self.conv1(x_dict, edge_index_dict)#, edge_index).relu()
-        #x_dict = {k: self.bn1(F.relu(v)) for k, v in x_dict.items() if v is not None}
-        #x_dict = self.conv2(x_dict, edge_index_dict)#, edge_index)
-        #x_dict = {k: self.bn2(v) for k, v in x_dict.items() if v is not None}
-        #x_dict = self.pool(x_dict, edge_index_dict)
+        # Encode 'a_transition' nodes
+        x_dict = self.encoder(x_dict, edge_index_dict)
 
-        x_dict = self.conv_unique(x_dict, edge_index_dict)
-
-        # Pass through decoder
-        #x_dict = F.relu(self.fc1(x_dict))
-        #x_dict = self.fc2(x_dict)
+        # Decode 'a_transition' nodes one by one
+        x_dict['a_transition'] = self.decoder(x_dict['a_transition'])
 
         if 'graph' in data.keys():
             if 'mask' in data.keys():
                 mask = data['mask']['a_transition'].x
                 mask = mask.masked_fill(mask == 0, float('-inf'))
                 mask = mask.masked_fill(mask == 1, 0)
-                #mask brings the values to -inf if the action is not valid
-
-                #x_dict's transition node is brought to -inf if the action is not valid
                 x_dict['a_transition'] = x_dict['a_transition'] + mask
-
-            #x_dict = {k: softmax(v, dim=0) for k, v in x_dict.items() if v is not None}
-            #import pdb; pdb.set_trace()
             x_dict = softmax(x_dict['a_transition'], dim=0)
-
-            #print the index of the highest value in the tensor
-            print(f"Action expected: {int(torch.argmax(x_dict))}")
-            print(f"Action probabilities: {x_dict}")
         else:
             mask = data['mask']
             mask = mask.masked_fill(mask == 0, float('-inf'))
             mask = mask.masked_fill(mask == 1, 0)
             x_dict['a_transition'] = x_dict['a_transition'] + mask
             x_dict = pyg_softmax(x_dict['a_transition'], index)
+
         return x_dict
 
 import torch.nn.functional as F
@@ -381,7 +364,7 @@ def make_policy_network(args, metadata=None):
         if args.load_policy_network:
             policy_network = torch.load(os.path.join(os.getcwd(), args.logdir, args.name, args.policy_network))
         else:
-            policy_network = HeteroActor(1, metadata=metadata)
+            policy_network = HeteroActor(16, metadata=metadata)
     else:
         raise Exception("Unknown environment! Are you sure it is spelled correctly?")
     #if args.policy_weights != "":

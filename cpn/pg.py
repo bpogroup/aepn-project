@@ -373,10 +373,10 @@ class Agent:
         self.policy_model.eval()  # set model to evaluation mode
         pi = self.policy_model(state)
         logpi = pi.log() #.unsqueeze(0))
-        #import pdb; pdb.set_trace()
+
         action = torch.multinomial(torch.exp(logpi.squeeze(1)), 1)[0]#[0, 0] #TODO: implement deterministic policy
-        print(f"Sampled action: {action}")
-        #import pdb; pdb.set_trace()
+        #print(f"Sampled action: {action}")
+
         if return_logprob:
             return action.item(), logpi[action].item()
         else:
@@ -608,8 +608,6 @@ class Agent:
         epsilon = 1e-10
         logpis = (self.policy_model(states) + epsilon).log()
         #logpis = self.policy_model(states).log()
-        #import pdb;
-        #pdb.set_trace()
         #new_logprobs contains, for each unique index in indexes, the value in the slice of logpis corresponding
         #to the current index in indexes with index action[index]
         new_logprobs = torch.stack([logpis[indexes == index][actions[index]] for index in indexes.unique()]).squeeze(1)
@@ -630,9 +628,9 @@ class Agent:
         loss.backward(retain_graph=True)  # compute gradients
 
         # Print out the gradients of the parameters
-        for name, param in self.policy_model.named_parameters():
-            if param.grad is not None:
-                print(f"Gradient of {name}: {param.grad}")
+        #for name, param in self.policy_model.named_parameters():
+        #    if param.grad is not None:
+        #        print(f"Gradient of {name}: {param.grad}")
 
 
         self.policy_optimizer.step()

@@ -5,18 +5,20 @@ from abc import ABC, abstractclassmethod
 import os
 
 import torch
-#from sb3_contrib import MaskablePPO
-#from sb3_contrib.common.maskable.policies import MaskableActorCriticPolicy
-#from stable_baselines3.common.logger import configure
+from sb3_contrib import MaskablePPO
+from sb3_contrib.common.maskable.policies import MaskableActorCriticPolicy
+from stable_baselines3.common.logger import configure
 import copy
 import time
 from torch_geometric.data import HeteroData
 
+from heuristics import SPT
 from train import make_parser, make_env, make_agent, make_logdir
 
 try:
     from .gym_env.additional_functions.function_dispatcher import FunctionDispatcher
     from .gym_env import new_aepn_env as aepn_env
+    from .gym_env import aepn_env as old_aepn_env
     from .pncomponents import Transition, TaggedTransition, Place, Token, Arc, ClockWrapper
     from .gym_env.additional_functions.new_color_functions import *
     from .gym_env.additional_functions.time_functions import *
@@ -25,6 +27,7 @@ try:
 except:
     from gym_env.additional_functions.function_dispatcher import FunctionDispatcher
     from gym_env import new_aepn_env
+    from gym_env import aepn_env as old_aepn_env
     from pncomponents import Transition, TaggedTransition, Place, Token, Arc, ClockWrapper
     from gym_env.additional_functions.new_color_functions import *
     from gym_env.additional_functions.time_functions import *
@@ -180,14 +183,18 @@ class PetriNet(AbstractPetriNet):
         bindings = [[]]
 
         if self.observation_type == 'vector' or not self.observation_type:
+
             for arc in transition.incoming:
                 new_bindings = []
-                for token in arc.src.marking.keys(): #get set of colors in incoming place
+                for token in arc.src.marking.keys():  # get set of colors in incoming place
                     for binding in bindings:
                         new_binding = binding.copy()
                         new_binding.append((arc, token))
                         new_bindings.append(new_binding)
-                    bindings = new_bindings
+                bindings = new_bindings
+            return bindings
+
+
         elif self.observation_type == 'graph':
             for arc in transition.incoming:
                 new_bindings = []
@@ -197,6 +204,7 @@ class PetriNet(AbstractPetriNet):
                         new_binding.append((arc, token))
                         new_bindings.append(new_binding)
                 bindings = new_bindings
+        #import pdb; pdb.set_trace()
         return bindings
 
     def transition_bindings(self, transition):
@@ -211,8 +219,8 @@ class PetriNet(AbstractPetriNet):
         if len(transition.incoming) == 0:
             raise Exception("Though it is strictly speaking possible, we do not allow transitions like '" + str(self) + "' without incoming arcs.")
 
+
         bindings = self.tokens_combinations(transition)
-        #import pdb; pdb.set_trace()
 
         # a binding must have all incoming arcs
         nr_incoming_arcs = len(transition.incoming)
@@ -239,7 +247,6 @@ class PetriNet(AbstractPetriNet):
                     #import pdb; pdb.set_trace()
                     time = token.time
             if enabled and transition.guard is not None:  # if the transition has a guard, that guard must evaluate to True with the given variable binding
-                #import pdb; pdb.set_trace()
                 #TODO: check if it works
                 dispatcher_result = self.dispatcher.dispatch(transition.guard, **variable_values)
                 enabled = dispatcher_result
@@ -266,6 +273,7 @@ class PetriNet(AbstractPetriNet):
         timed_bindings = []
         for t in self.transitions:
             for (binding, time) in self.transition_bindings(t):
+
                 if time is None:
                     untimed_bindings.append((binding, time))
                 else:
@@ -274,7 +282,7 @@ class PetriNet(AbstractPetriNet):
         # if there are no such bindings, set the clock to the earliest time at which there are
         timed_bindings.sort(key=lambda b: b[1])
         if len(timed_bindings) > 0 and timed_bindings[0][1] > self.clock:
-            self.clock = timed_bindings[0][1]
+            self.clock.value = timed_bindings[0][1]
         # now return the untimed bindings + the timed bindings that have time <= clock
         return untimed_bindings + [(binding, time) for (binding, time) in timed_bindings if time <= self.clock]
 
@@ -388,16 +396,16 @@ class AEPetriNet(PetriNet):
                 if (timed_bindings_other[0][1] <= timed_bindings_curr[0][1]):
                     #import pdb; pdb.set_trace()
                     self.switch_tag()
-                    self.clock = timed_bindings_other[0][1]
+                    self.clock.value = timed_bindings_other[0][1]
                     #print(f"Tag switched to {self.tag} at time {self.clock}")
                     timed_bindings_curr = timed_bindings_other
                 else:
-                    self.clock = timed_bindings_curr[0][1]
+                    self.clock.value = timed_bindings_curr[0][1]
             else:
-                self.clock = timed_bindings_curr[0][1]
+                self.clock.value = timed_bindings_curr[0][1]
         elif len(timed_bindings_curr) == 0 and len(timed_bindings_other) != 0:
             self.switch_tag()
-            self.clock = timed_bindings_other[0][1]
+            self.clock.value = timed_bindings_other[0][1]
             #print(f"Tag switched to {self.tag} at time {self.clock}")
             timed_bindings_curr = timed_bindings_other
         else:
@@ -450,6 +458,7 @@ class AEPetriNet(PetriNet):
         self.update_reward(timed_binding)
 
         #print(f"Fired transition with binding {binding} at time {self.clock}")
+
 
     def update_reward(self, timed_binding):
         (binding, time) = timed_binding
@@ -526,6 +535,8 @@ class AEPetriNet(PetriNet):
                     for ass in associations:
                         variable_values_list.append(dict(zip(variables, ass)))
 
+                    #import pdb; pdb.set_trace()
+
                     # evaluate guard for each fictious binding to determine possible associations
                     for variable_values in variable_values_list:
                         if t.guard:
@@ -560,16 +571,17 @@ class AEPetriNet(PetriNet):
                     variable_values_list = []
                     for ass in associations:
                         variable_values_list.append(dict(zip(variables, ass)))
+                    #import pdb; pdb.set_trace()
 
                     # evaluate guard for each fictious binding to determine possible associations
                     for variable_values in variable_values_list:
                         if t.guard:
+
                             v_v_original = {**variable_values}
                             #exec(compile(self.additional_functions + "result = " + t.guard, "<string>", "exec"),
                             #     variable_values)
                             #enabled = variable_values['result']
                             dispatcher_result = self.dispatcher.dispatch(t.guard, **variable_values)
-                            print("Got here")
                             enabled = dispatcher_result
                             if enabled: color_associations.append(v_v_original)
                         else:
@@ -578,13 +590,14 @@ class AEPetriNet(PetriNet):
                 color_associations_strings = sorted([json.dumps(a) for a in
                                                      color_associations])  # sort alphabetically to ensure the same positions in subsequent runs
                 color_associations = [json.loads(a) for a in color_associations_strings]
+
+
                 return color_associations
         elif self.observation_type == 'graph':
             """
             Return a list of all the available actions in the form of list of nodes indexes in the graph corresponding to
             the petri net
             """
-            import pdb; pdb.set_trace()
             return self.actions_dict
         else:
             raise Exception("Invalid value for parameter obs_type")
@@ -594,12 +607,12 @@ class AEPetriNet(PetriNet):
         """
         Valid actions are given by the colors of tokens in places connected to arcs incoming to "a" tagged transitions
         """
-        if self.obs_type == 'vector':
+        if self.observation_type == 'vector':
             bindings = self.bindings()[0] #take all bindings without time
             inscr_color_bindings = self.bindings_to_associations(bindings)
 
             return inscr_color_bindings
-        elif self.obs_type == 'graph':
+        elif self.observation_type == 'graph':
             """
             Return a list of all the available actions in the form of list of nodes indexes in the graph corresponding to
             the petri net
@@ -651,7 +664,7 @@ class AEPetriNet(PetriNet):
                     for p in self.expanded_pn.places:
                         if p._id.split('.')[0] == n_t:
                             for token in p.marking:  # will always be only one
-                                token_value = torch.tensor([value for key, value in token.color.items()]).type(torch.float32)
+                                token_value = torch.tensor([float(value) for key, value in token.color.items()]).type(torch.float32) #assuming the colors are all floats
                                 p_nodes.append(token_value)
                     #if p_nodes:
                     #    ret_graph[n_t].x = torch.stack(p_nodes)
@@ -797,7 +810,6 @@ class AEPetriNet(PetriNet):
 
             if t.tag == 'e': #E transitions are not expanded (they are not affected by the action) def __init__(self, _id, tag, reward, guard=None):
                 expanded_pn.add_transition(TaggedTransition(t._id, tag=t.tag, reward=t.reward, guard=t.guard))
-#                for i, b in enumerate(transition_bindings): #TODO: make sure this works in every situation
                 for arc in t.incoming:
                     for idx in range(len(arc.src.marking)):
                         expanded_pn.add_arc_by_ids(arc.src._id + '.' + str(idx), arc.dst._id, arc.inscription,
@@ -860,7 +872,7 @@ class AEPetriNet(PetriNet):
 
             inscr_color_bindings = self.bindings_to_associations(bindings)
 
-            action_bindings = [bindings[ind] for ind, b in enumerate(inscr_color_bindings) if b==action] #select only the bindings that comply with the chosen action
+            action_bindings = [bindings[ind] for ind, b in enumerate(inscr_color_bindings) if b == action] #select only the bindings that comply with the chosen action
 
             if len(action_bindings) > 0:
                 prev_tag = self.tag
@@ -909,16 +921,16 @@ class AEPetriNet(PetriNet):
         print(f"Total reward random over {length} steps: {self.rewards} \n")
         return run, self.rewards
 
-    def training_run(self, num_steps, episode_length, load_model, out_model_name="model.pt", out_folder_name = './out'):
+    def training_run(self, num_steps, episode_length, load_model, out_model_name="model.pt", out_folder_name='./out'):
         """
         Runs the petri net as a reinforcement learning environment
         """
+        self.length = episode_length
 
-
-        env = new_aepn_env.AEPN_Env(self, length = episode_length)
+        env = old_aepn_env.AEPN_Env(self)
 
         out_path = os.path.join(out_folder_name, out_model_name)
-        #Logging to tensorboard. To access tensorboard, open a bash terminal in the projects directory, activate the environment (where tensorflow should be installed) and run the command in the following line
+        # Logging to tensorboard. To access tensorboard, open a bash terminal in the projects directory, activate the environment (where tensorflow should be installed) and run the command in the following line
         # tensorboard --logdir ./tmp/
         # then, in a browser page, access localhost:6006 to see the board
         log_dir = os.path.join(out_folder_name, 'log')
@@ -926,6 +938,16 @@ class AEPetriNet(PetriNet):
         if not os.path.exists(out_folder_name):
             os.makedirs(out_folder_name)
             os.makedirs(log_dir)
+
+        if load_model:
+            model = MaskablePPO.load(out_path, env, n_steps=50)
+        else:
+            model = MaskablePPO(MaskableActorCriticPolicy, env, n_steps=50, verbose=1)
+
+        model.set_logger(configure(log_dir, ["stdout", "csv", "tensorboard"]))
+        model.learn(total_timesteps=num_steps)
+        env.reset()
+        model.save(out_path)
 
         print("Training over")
 
@@ -966,7 +988,32 @@ class AEPetriNet(PetriNet):
                 with open(os.path.join(logdir, "results.csv"), 'a') as f:
                     f.write(f"{reward},{length}\n")
 
-    def new_testing_run(self, length, additional_functions=None, out_model_name="network-500.pth", out_folder_name='./out'):
+    def testing_run(self, length, additional_functions=None, out_model_name="model.pt", out_folder_name='./out'):
+        """
+        Loads a trained model and performs length steps of evaluation
+        """
+        self.length = length
+
+        out_path = os.path.join('out', out_model_name)
+        model = MaskablePPO.load(out_path)
+        env = old_aepn_env.AEPN_Env(self)
+        env.reset()
+
+        done = False
+        t_rewards = 0
+        while not done:
+            # Retrieve current action mask
+            obs = self.get_observation()
+            action_masks = env.action_masks()
+            action, _states = model.predict(obs, action_masks=action_masks)
+            obs, rewards, done, info = env.step(action)
+            t_rewards += rewards  # unused
+
+        total_reward_ppo = env.pn.rewards
+        return total_reward_ppo
+
+
+    def new_testing_run(self, length, additional_functions=None, out_model_name="network-100.pth", out_folder_name='./out'):
         """
         Loads a trained model and performs length steps of evaluation
         """
@@ -1002,15 +1049,34 @@ class AEPetriNet(PetriNet):
         total_reward_ppo = env.pn.rewards
         return total_reward_ppo
 
+    def heuristic_testing_run(self, length, additional_functions=None, out_folder_name='./out'):
+        """
+        Performs length steps of evaluation using a heuristic
+        """
+        self.length = length
+        heuristic = SPT(self)
+
+        env = new_aepn_env.AEPN_Env(self)
+        done = False
+        t_rewards = 0
+        while not done:
+            obs = self.get_observation()
+            action = heuristic.get_action(obs)
+            obs, rewards, done, truncated, info = env.step(action)
+            t_rewards += rewards
+        total_reward_heuristic = env.pn.rewards
+        return total_reward_heuristic
+
     def run_evolutions(self, run, i, active_model):
         """
         Function invoked by Gym environment to let the network perform evolutions when no actions are required
         """
 
-        while self.clock <= self.length and active_model:
+        #while self.clock <= self.length and active_model:
+        while active_model:
             bindings, active_model = self.bindings()
-            if self.tag == 'a': #the bindings() function controls the evolution of self.tag, so we need to break the cicle as soon as tag == 'a'
-                break
+            #if self.tag == 'a': #the bindings() function controls the evolution of self.tag, so we need to break the cicle as soon as tag == 'a'
+            #    break
             if len(bindings) > 0 and self.tag == 'e':
                 binding = random.choice(bindings)
                 run.append(binding)
@@ -1027,18 +1093,26 @@ class AEPetriNet(PetriNet):
 
 #TODO: collapse the number of places in the network by merging places with the same marking and the same incoming and outgoing arcs adding a feature that counts the number of occurrences of the same token in the place
 if __name__ == "__main__":
-    test_cpn = False #test standard cpn implementation
+
+    observation_type = 'graph' #'vector' for old version, 'graph' for new version
 
     test_simple_aepn = False #test a simple aepn for testing purposes
     test_task_assignment = False #test a-e cpn for task assignment problem
-    test_consulting_firm = True
+    test_simple_consulting_firm = False
+    test_consulting_firm = False
+    test_hard_consulting_firm = True
 
     test_simulation = False
-    test_training = True
-    test_inference = False
+    test_training = False
+    test_inference = True
+    test_heuristic = False
 
     #maximum value of self.clock
-    max_length = 10
+    max_length = 9 #this is actually 10 steps since we start from 0
+
+    #for testing
+    length = max_length
+    replications = 1000
 
     import platform
 
@@ -1067,121 +1141,247 @@ if __name__ == "__main__":
 
 
     my_functions = temp + '\n' + temp_t
-    pn = AEPetriNet(my_functions, observation_type='graph')
+    pn = AEPetriNet(my_functions, observation_type=observation_type)
 
-    if test_task_assignment:
+    if observation_type == 'vector':
+        if test_simple_consulting_firm:
+            pn.add_place(Place("arrival", colors_set={'{"type":0,"budget":100}','{"type":1,"budget":200}'})) #CAREFUL: due to a piece of code in get_actions, if case is defined before resource, as a place, also the arcs need to be in the same order (see HERE)
+            pn.add_place(Place("waiting", colors_set={'{"type":0,"budget":100}','{"type":1,"budget":200}'}))
+            pn.add_place(Place("resources", colors_set={'{"id":0}'}))
 
-        pn.add_place(Place("arrival", tokens_attributes={"type": "int"})) #attribute TIME is always added by default
-        pn.add_place(Place("waiting", tokens_attributes={"type": "int"}))
-        pn.add_place(Place("resources", tokens_attributes={"type": "int", "compatibility_0": "int", "compatibility_1": "int", "is_set": "int"}))
-        pn.add_place(Place("busy", tokens_attributes={'resource_type': 'int', 'task_type': 'int', 'compatibility_0': 'int', 'compatibility_1': 'int'}))
+            pn.add_transition(TaggedTransition("arrive", tag='e', reward=0))
+            pn.add_transition(TaggedTransition("start", tag='a', reward='get_budget_str'))
+            # pn.add_transition(TaggedTransition("complete", tag='e', reward='get_budget'))
 
-        pn.add_transition(TaggedTransition("arrive", tag='e', reward=0))
-        pn.add_transition(TaggedTransition("set_compatibility", guard="is_not_set", tag='e', reward=0))
-        pn.add_transition(TaggedTransition("start", tag='a', reward=0))
-        pn.add_transition(TaggedTransition("complete", tag='e', reward=1))
+            pn.add_arc_by_ids("arrival", "arrive", "x")
+            pn.add_arc_by_ids("arrive", "arrival", "x", time_expression=1)
+            pn.add_arc_by_ids("arrive", "waiting", "x", time_expression=0)
 
-        pn.add_arc_by_ids("arrival", "arrive", "x")
-        pn.add_arc_by_ids("arrive", "arrival", "x", time_expression=1)
-        pn.add_arc_by_ids("arrive", "waiting", "x", time_expression=0)
+            pn.add_arc_by_ids("waiting", "start", "case") #HERE if this and the next line are switched, it breaks. TODO: modify get_actions
+            pn.add_arc_by_ids("resources", "start", "resource")
 
-        pn.add_arc_by_ids("resources", "set_compatibility", "resource")
-        pn.add_arc_by_ids("set_compatibility", "resources", "set_compatibility", time_expression=0)
+            pn.add_arc_by_ids("start", "resources", "resource", time_expression=1)
+            # pn.add_arc_by_ids("start", "busy", "case", time_expression=1)
 
-        pn.add_arc_by_ids("resources", "start", "resource")
-        pn.add_arc_by_ids("waiting", "start", "case")
-        pn.add_arc_by_ids("start", "busy", "new_combine", time_expression="get_compatibility")
+            # pn.add_arc_by_ids("busy", "complete", "case_resource")
+            # pn.add_arc_by_ids("complete", "resources", "empty_token", time_expression=0)
 
-        pn.add_arc_by_ids("busy", "complete", "case_resource")
-        pn.add_arc_by_ids("complete", "resources", "new_split", time_expression=0)
+            # pn.add_mark_by_id("resources", {'average_completion_time': 3}, 0)
+            pn.add_mark_by_id("arrival", '{"type":0,"budget":100}', 0) #CAREFUL: no spaces!!
+            pn.add_mark_by_id("arrival", '{"type":1,"budget":200}', 0)
+            pn.add_mark_by_id("resources", '{"id":0}', 0)  # HERE: same as before!
 
-        pn.add_mark_by_id("resources", {'type': 0, 'compatibility_0': 1, 'compatibility_1': 1, 'is_set': 0}, 0)
-        pn.add_mark_by_id("resources", {'type': 1, 'compatibility_0': 1, 'compatibility_1': 1, 'is_set': 0}, 0)
-        pn.add_mark_by_id("arrival", {'type': 0}, 0)
-        pn.add_mark_by_id("arrival", {'type': 1}, 0)
+        elif test_consulting_firm:
+            pn.add_place(Place("arrival", colors_set={'{"type":0}','{"type":1}'}))
+            pn.add_place(Place("waiting", colors_set={'{"type":0,"budget":}','{"type":1,"budget":}'}))
 
-    #print(pn)
-    elif test_simple_aepn:
-        #orders could be lost if they are not processed within 1 time unit
-        pn.add_place(Place("arrival", tokens_attributes={"type": "int"}))
-        pn.add_place(Place("waiting", tokens_attributes={"type": "int"}))
-        pn.add_place(Place("resources", tokens_attributes={"type": "int"}))
+        if test_training:
+            start_time = time.time()
+            pn.training_run(1000000, max_length, False)
+            print("TRAINING TIME: --- %s seconds ---" % (time.time() - start_time))
+        elif test_inference:
 
-        pn.add_transition(TaggedTransition("arrive", tag='e', reward=0))
-        pn.add_transition(TaggedTransition("start", tag='a', reward="get_reward"))
-        #pn.add_transition(TaggedTransition("lose_order", tag='e', reward=0))
+            r_vec_ppo = []
+            r_vec_random = []
+            for i in range(replications):
+                ppo_pn = copy.deepcopy(pn)
+                rand_pn = copy.deepcopy(pn)
 
-        pn.add_arc_by_ids("arrival", "arrive", "x")
-        pn.add_arc_by_ids("arrive", "arrival", "x", time_expression=1)
-        pn.add_arc_by_ids("arrive", "waiting", "x", time_expression=0)
-        #pn.add_arc_by_ids("waiting", "lose_order", "x", guard_function="is_late(x)", time_expression=0)
-        pn.add_arc_by_ids("resources", "start", "resource")
-        pn.add_arc_by_ids("waiting", "start", "case")
-        pn.add_arc_by_ids("start", "resources", "resource", time_expression=1)
+                total_reward_ppo = ppo_pn.testing_run(length)
+                r_vec_ppo.append(total_reward_ppo)
+                run, total_reward_random = rand_pn.simulation_run(length)
+                r_vec_random.append(total_reward_random)
+            import numpy as np
 
-        pn.add_mark_by_id("resources", {'type': 0}, 0)
-        pn.add_mark_by_id("resources", {'type': 10}, 0)
-        pn.add_mark_by_id("arrival", {'type': 0}, 0)
-        pn.add_mark_by_id("arrival", {'type': 10}, 0)
-
-    elif test_consulting_firm:
-
-        pn.add_place(Place("arrival", tokens_attributes={"average_interarrival_time": "int"})) #attribute TIME is always added by default
-        pn.add_place(Place("waiting", tokens_attributes={"budget": "int", "arrival_time": "int", "patience": "int"})) #TODO: make "patience" unobservable
-        pn.add_place(Place("resources", tokens_attributes={"average_completion_time": "int"}))
-        pn.add_place(Place("busy", tokens_attributes={'resource_average_completion_time': 'int', 'task_type': 'int', 'budget': 'int'}))
-
-        pn.add_transition(TaggedTransition("arrive", tag='e', reward=0))
-        pn.add_transition(TaggedTransition("start", tag='a', reward=0))
-        pn.add_transition(TaggedTransition("complete", tag='e', reward='get_budget'))
-        pn.add_transition(TaggedTransition("lose_order", tag='e', reward=0, guard="is_late"))
-        #pn.add_transition(TaggedTransition("decrement_patience", tag='e', reward=0, guard="is_not_late"))
-
-        pn.add_arc_by_ids("arrival", "arrive", "x")
-        pn.add_arc_by_ids("arrive", "arrival", "x", time_expression='exponential_mean')
-        pn.add_arc_by_ids("arrive", "waiting", "randomize_budget_and_patience", time_expression=0)
-
-        pn.add_arc_by_ids("waiting", "lose_order", "case")
-
-        pn.add_arc_by_ids("resources", "start", "resource")
-        pn.add_arc_by_ids("waiting", "start", "case")
-        pn.add_arc_by_ids("start", "busy", "combine_budget", time_expression="randomize_completion_time") #for now, the randomization is not done and the average time is considered
-
-        pn.add_arc_by_ids("busy", "complete", "case_resource")
-        pn.add_arc_by_ids("complete", "resources", "get_resource", time_expression=0)
-
-        pn.add_mark_by_id("resources", {'average_completion_time': 2}, 0)
-        #pn.add_mark_by_id("resources", {'average_completion_time': 3}, 0)
-        pn.add_mark_by_id("arrival", {'average_interarrival_time': 1}, 0)
+            print(f"Average reward PPO: {np.mean(r_vec_ppo)} with standard deviation {np.std(r_vec_ppo)}"
+                  f"\nAverage reward random: {np.mean(r_vec_random)} with standard deviation {np.std(r_vec_random)}")
 
 
 
 
-    if test_simulation:
-        test_run = pn.simulation_run(1000)
-        for test_binding in test_run:
-            print(test_binding)
+    else:
+        if test_task_assignment:
 
-    elif test_training:
-        start_time = time.time()
-        pn.new_training_run(max_length, test_inference)
-        print("TRAINING TIME: --- %s seconds ---" % (time.time() - start_time))
+            pn.add_place(Place("arrival", tokens_attributes={"type": "int"})) #attribute TIME is always added by default
+            pn.add_place(Place("waiting", tokens_attributes={"type": "int"}))
+            pn.add_place(Place("resources", tokens_attributes={"type": "int", "compatibility_0": "int", "compatibility_1": "int", "is_set": "int"}))
+            pn.add_place(Place("busy", tokens_attributes={'resource_type': 'int', 'task_type': 'int', 'compatibility_0': 'int', 'compatibility_1': 'int'}))
 
-    elif test_inference:
+            pn.add_transition(TaggedTransition("arrive", tag='e', reward=0))
+            pn.add_transition(TaggedTransition("set_compatibility", guard="is_not_set", tag='e', reward=0))
+            pn.add_transition(TaggedTransition("start", tag='a', reward=0))
+            pn.add_transition(TaggedTransition("complete", tag='e', reward=1))
 
-        length = 50
-        
-        repetitions = 1
+            pn.add_arc_by_ids("arrival", "arrive", "x")
+            pn.add_arc_by_ids("arrive", "arrival", "x", time_expression=1)
+            pn.add_arc_by_ids("arrive", "waiting", "x", time_expression=0)
 
-        r_vec_ppo = []
-        r_vec_random = []
-        for i in range(repetitions):
-            pn = copy.copy(pn)
-            rand_pn = copy.deepcopy(pn)
+            pn.add_arc_by_ids("resources", "set_compatibility", "resource")
+            pn.add_arc_by_ids("set_compatibility", "resources", "set_compatibility", time_expression=0)
 
-            total_reward_ppo = pn.new_testing_run(length, additional_functions = my_functions)
-            r_vec_ppo.append(total_reward_ppo)
-            run, total_reward_random = rand_pn.simulation_run(length)
-            r_vec_random.append(total_reward_random)
-        import numpy as np
-        print(f"Average reward PPO: {np.mean(r_vec_ppo)} with standard deviation {np.std(r_vec_ppo)}\nAverage reward random: {np.mean(r_vec_random)} with standard deviation {np.std(r_vec_random)}")
+            pn.add_arc_by_ids("resources", "start", "resource")
+            pn.add_arc_by_ids("waiting", "start", "case")
+            pn.add_arc_by_ids("start", "busy", "new_combine", time_expression="get_compatibility")
+
+            pn.add_arc_by_ids("busy", "complete", "case_resource")
+            pn.add_arc_by_ids("complete", "resources", "new_split", time_expression=0)
+
+            pn.add_mark_by_id("resources", {'type': 0, 'compatibility_0': 1, 'compatibility_1': 1, 'is_set': 0}, 0)
+            pn.add_mark_by_id("resources", {'type': 1, 'compatibility_0': 1, 'compatibility_1': 1, 'is_set': 0}, 0)
+            pn.add_mark_by_id("arrival", {'type': 0}, 0)
+            pn.add_mark_by_id("arrival", {'type': 1}, 0)
+
+        #print(pn)
+        elif test_simple_aepn:
+            #orders could be lost if they are not processed within 1 time unit
+            pn.add_place(Place("arrival", tokens_attributes={"type": "int"}))
+            pn.add_place(Place("waiting", tokens_attributes={"type": "int"}))
+            pn.add_place(Place("resources", tokens_attributes={"type": "int"}))
+
+            pn.add_transition(TaggedTransition("arrive", tag='e', reward=0))
+            pn.add_transition(TaggedTransition("start", tag='a', reward="get_reward"))
+            #pn.add_transition(TaggedTransition("lose_order", tag='e', reward=0))
+
+            pn.add_arc_by_ids("arrival", "arrive", "x")
+            pn.add_arc_by_ids("arrive", "arrival", "x", time_expression=1)
+            pn.add_arc_by_ids("arrive", "waiting", "x", time_expression=0)
+            #pn.add_arc_by_ids("waiting", "lose_order", "x", guard_function="is_late(x)", time_expression=0)
+            pn.add_arc_by_ids("resources", "start", "resource")
+            pn.add_arc_by_ids("waiting", "start", "case")
+            pn.add_arc_by_ids("start", "resources", "resource", time_expression=1)
+
+            pn.add_mark_by_id("resources", {'type': 0}, 0)
+            pn.add_mark_by_id("resources", {'type': 10}, 0)
+            pn.add_mark_by_id("arrival", {'type': 0}, 0)
+            pn.add_mark_by_id("arrival", {'type': 10}, 0)
+
+        elif test_simple_consulting_firm:
+
+            pn.add_place(Place("arrival", tokens_attributes={"type": "int", "budget": "int"})) #attribute TIME is always added by default
+            pn.add_place(Place("waiting", tokens_attributes={"type": "int", "budget": "int"})) #TODO: make "patience" unobservable
+            pn.add_place(Place("resources", tokens_attributes={"id": "int"}))
+            #pn.add_place(Place("busy", tokens_attributes={'type': 'int', 'budget': 'int'}))
+
+            pn.add_transition(TaggedTransition("arrive", tag='e', reward=0))
+            pn.add_transition(TaggedTransition("start", tag='a', reward='get_budget'))
+            #pn.add_transition(TaggedTransition("complete", tag='e', reward='get_budget'))
+
+            pn.add_arc_by_ids("arrival", "arrive", "x")
+            pn.add_arc_by_ids("arrive", "arrival", "x", time_expression=1)
+            pn.add_arc_by_ids("arrive", "waiting", "x", time_expression=0)
+
+            pn.add_arc_by_ids("resources", "start", "resource")
+            pn.add_arc_by_ids("waiting", "start", "case")
+            pn.add_arc_by_ids("start", "resources", "resource", time_expression=1)
+            #pn.add_arc_by_ids("start", "busy", "case", time_expression=1)
+
+            #pn.add_arc_by_ids("busy", "complete", "case_resource")
+            #pn.add_arc_by_ids("complete", "resources", "empty_token", time_expression=0)
+
+            pn.add_mark_by_id("resources", {"id": 0}, 0) #resources do not have attributes
+            #pn.add_mark_by_id("resources", {'average_completion_time': 3}, 0)
+            pn.add_mark_by_id("arrival", {"type": 0, 'budget': 100}, 0)
+            pn.add_mark_by_id("arrival", {"type": 1, 'budget': 200}, 0)
+
+        elif test_consulting_firm:
+
+            pn.add_place(Place("arrival", tokens_attributes={"type": "int"})) #attribute TIME is always added by default
+            pn.add_place(Place("waiting", tokens_attributes={"type": "int", "budget": "int"})) #TODO: make "patience" unobservable
+            pn.add_place(Place("resources", tokens_attributes={"id": "int"}))
+            #pn.add_place(Place("busy", tokens_attributes={'type': 'int', 'budget': 'int'}))
+
+            pn.add_transition(TaggedTransition("arrive", tag='e', reward=0))
+            pn.add_transition(TaggedTransition("start", tag='a', reward='get_budget'))
+            #pn.add_transition(TaggedTransition("complete", tag='e', reward='get_budget'))
+
+            pn.add_arc_by_ids("arrival", "arrive", "x")
+            pn.add_arc_by_ids("arrive", "arrival", "x", time_expression=1)
+            pn.add_arc_by_ids("arrive", "waiting", "randomize_budget_uniform", time_expression=0)
+
+            pn.add_arc_by_ids("resources", "start", "resource")
+            pn.add_arc_by_ids("waiting", "start", "case")
+            pn.add_arc_by_ids("start", "resources", "resource", time_expression=1)
+            #pn.add_arc_by_ids("start", "busy", "case", time_expression=1)
+
+            #pn.add_arc_by_ids("busy", "complete", "case_resource")
+            #pn.add_arc_by_ids("complete", "resources", "empty_token", time_expression=0)
+
+            pn.add_mark_by_id("resources", {"id": 0}, 0) #resources do not have attributes
+            #pn.add_mark_by_id("resources", {'average_completion_time': 3}, 0)
+            pn.add_mark_by_id("arrival", {'type': 0}, 0)
+            pn.add_mark_by_id("arrival", {'type': 1}, 0)
+
+        elif test_hard_consulting_firm:
+
+            pn.add_place(Place("arrival", tokens_attributes={"type": "int", "average_interarrival_time": "int"})) #attribute TIME is always added by default
+            pn.add_place(Place("waiting", tokens_attributes={"type": "int",  "budget": "int", "patience": "int", "arrival_time": "int"})) #TODO: make "patience" unobservable
+            pn.add_place(Place("resources", tokens_attributes={"average_completion_time": "int"}))
+            #pn.add_place(Place("busy", tokens_attributes={'resource_average_completion_time': 'int', 'task_type': 'int', 'budget': 'int'}))
+
+            pn.add_transition(TaggedTransition("arrive", tag='e', reward=0))
+            pn.add_transition(TaggedTransition("start", tag='a', reward='get_budget'))
+            #pn.add_transition(TaggedTransition("complete", tag='e', reward=0))
+            pn.add_transition(TaggedTransition("lose_order", tag='e', reward=0, guard="is_late"))
+
+            pn.add_arc_by_ids("arrival", "arrive", "x")
+            pn.add_arc_by_ids("arrive", "arrival", "x", time_expression='exponential_mean')
+            pn.add_arc_by_ids("arrive", "waiting", "randomize_budget_and_patience", time_expression=0)
+
+            pn.add_arc_by_ids("waiting", "lose_order", "case")
+
+            pn.add_arc_by_ids("resources", "start", "resource")
+            pn.add_arc_by_ids("waiting", "start", "case")
+            #pn.add_arc_by_ids("start", "busy", "combine_budget", time_expression="randomize_completion_time") #for now, the randomization is not done and the average time is considered
+            pn.add_arc_by_ids("start", "resources", "resource", time_expression="randomize_completion_time")
+
+            #pn.add_arc_by_ids("busy", "complete", "case_resource")
+            #pn.add_arc_by_ids("complete", "resources", "get_resource", time_expression=0)
+
+            pn.add_mark_by_id("resources", {'average_completion_time': 2}, 0)
+            pn.add_mark_by_id("resources", {'average_completion_time': 1}, 0)
+            pn.add_mark_by_id("arrival", {'type': 0, 'average_interarrival_time': 1}, 0)
+            pn.add_mark_by_id("arrival", {'type': 1, 'average_interarrival_time': 1}, 0)
+
+
+
+
+        if test_simulation:
+            test_run = pn.simulation_run(1000)
+            for test_binding in test_run:
+                print(test_binding)
+
+        elif test_training:
+            start_time = time.time()
+            pn.new_training_run(max_length, test_inference)
+            print("TRAINING TIME: --- %s seconds ---" % (time.time() - start_time))
+
+        elif test_inference:
+
+
+
+            r_vec_ppo = []
+            r_vec_heuristic = []
+            r_vec_random = []
+            for i in range(replications):
+                ppo_pn = copy.deepcopy(pn)
+                heur_pn = copy.deepcopy(pn)
+                rand_pn = copy.deepcopy(pn)
+
+                total_reward_ppo = ppo_pn.new_testing_run(length, additional_functions = my_functions)
+                r_vec_ppo.append(total_reward_ppo)
+                total_reward_heuristic = heur_pn.heuristic_testing_run(length)
+                r_vec_heuristic.append(total_reward_heuristic)
+                run, total_reward_random = rand_pn.simulation_run(length)
+                r_vec_random.append(total_reward_random)
+            import numpy as np
+            print(f"Average reward PPO: {np.mean(r_vec_ppo)} with standard deviation {np.std(r_vec_ppo)}"
+                  f"\nAverage reward SPT heuristic: {np.mean(r_vec_heuristic)} with standard deviation {np.std(r_vec_heuristic)}"
+                  f"\nAverage reward random: {np.mean(r_vec_random)} with standard deviation {np.std(r_vec_random)}")
+
+        elif test_heuristic:
+            length = 9
+            r_vec_heuristic = []
+            r_vec_heuristic.append(pn.heuristic_testing_run(length))
+
+            print(
+                f"Average reward SPT heuristic: {np.mean(r_vec_heuristic)} with standard deviation {np.std(r_vec_heuristic)}")

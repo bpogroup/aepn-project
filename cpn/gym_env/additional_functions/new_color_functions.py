@@ -1,4 +1,6 @@
 import json
+
+import numpy
 import numpy as np
 import math
 import random
@@ -196,35 +198,82 @@ def get_reward(case, resource):
     else:
         return 0
 
+def get_budget_str(case, resource):
+    case = json.loads(case)
+    return case['budget']
 
-def get_budget(case_resource):
-    return case_resource['budget']
+def get_budget(case, resource):
+    return case['budget']
 
-def is_late(case):
-    return case['patience'] <= 0
+#NOTE: CLOCK is a reserved name for the clock variable, and it must be passed as the first argument to the function
+def is_late(CLOCK, case):
+    if case['patience'] <= CLOCK:
+       print('Late case')
+    return case['patience'] <= CLOCK
 
-def is_not_late(case):
-    return case['patience'] > 0
-
-def get_patience(case):
-    return case['patience']
-
-def update_patience(case):
-    case['patience'] -= 1
-    return case
 
 def combine_budget(case, resource):
-    return {'resource_average_completion_time': resource['average_completion_time'], 'budget': case['budget']}
+    return {'task_type':case['type'], 'resource_average_completion_time': resource['average_completion_time'], 'budget': case['budget']}
 
 def get_resource(case_resource):
     return {'average_completion_time': case_resource['resource_average_completion_time']}
 
 def randomize_budget_and_patience(CLOCK, x):
-    mu = 100  # Mean budget
-    sigma = 10  # Standard deviation budget
-    x['budget'] = math.ceil(random.gauss(mu, sigma)) #budget is an integer
+    x = x.copy()
+    del x['average_interarrival_time']
+    if not 'type' in x.keys():
+        mu = 100  # Mean budget
+        sigma = 10  # Standard deviation budget
 
-    x['patience'] = CLOCK + random.expovariate(1/2) #the interarrival time is 1, so the patience should be on average less than the arrivals
+
+    else:
+        if x['type'] == 0:
+            mu = 100
+        else:
+            mu = 200
+        sigma = 10
+
+    x['budget'] = round(random.gauss(mu, sigma), 2)  # budget is rounded to 2 decimal places
+
+    #import pdb; pdb.set_trace()
+    x['patience'] = CLOCK + random.expovariate(1/2) #the interarrival time is 1, so the patience should be on average higher than the arrivals
     x['arrival_time'] = CLOCK
+    return x
+
+
+def randomize_budget(x):
+    x = x.copy() #CAREFUL: if x is a dictionary, it is passed by reference, so it is modified in place. In general, we want to make a copy at the beginning of the function
+    if x['type'] == 0:
+        mu = 100
+    else:
+        mu = 200
+    sigma = 25  # Standard deviation budget
+    x['budget'] = round(random.gauss(mu, sigma), 2) #budget is an integer
 
     return x
+
+def randomize_budget_uniform(x):
+    x = x.copy()
+    if x['type'] == 0:
+        x['budget'] = round(numpy.random.uniform(70, 130), 2)
+    else:
+        x['budget'] = round(numpy.random.uniform(170, 230), 2)
+    return x
+
+def randomize_budget_uniform_str(x):
+    x = json.loads(x)
+    if x['type'] == 0:
+        x['budget'] = round(numpy.random.uniform(70, 130), 2)
+    else:
+        x['budget'] = round(numpy.random.uniform(170, 230), 2)
+    return json.dumps(x).replace(" ", "")
+def set_fixed_budget(x):
+    x = x.copy()
+    if x['type'] == 0:
+        x['budget'] = 100
+    else:
+        x['budget'] = 200
+    return x
+
+def empty_token(case_resource):
+    return {}

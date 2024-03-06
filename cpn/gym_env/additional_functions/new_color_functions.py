@@ -247,7 +247,7 @@ def randomize_budget(x):
         mu = 100
     else:
         mu = 200
-    sigma = 25  # Standard deviation budget
+    sigma = 10  # Standard deviation budget
     x['budget'] = round(random.gauss(mu, sigma), 2) #budget is an integer
 
     return x
@@ -258,6 +258,7 @@ def randomize_budget_uniform(x):
         x['budget'] = round(numpy.random.uniform(70, 130), 2)
     else:
         x['budget'] = round(numpy.random.uniform(170, 230), 2)
+
     return x
 
 def randomize_budget_uniform_str(x):
@@ -266,7 +267,8 @@ def randomize_budget_uniform_str(x):
         x['budget'] = round(numpy.random.uniform(70, 130), 2)
     else:
         x['budget'] = round(numpy.random.uniform(170, 230), 2)
-    return json.dumps(x).replace(" ", "")
+    #import pdb; pdb.set_trace()
+    return json.dumps(x)#.replace(" ", "")
 def set_fixed_budget(x):
     x = x.copy()
     if x['type'] == 0:
@@ -277,3 +279,17 @@ def set_fixed_budget(x):
 
 def empty_token(case_resource):
     return {}
+
+def generate_vector_color_set():
+    # Generate all possible values from the uniform distribution
+    type_0_budgets = np.round(np.arange(70, 130.01, 0.01), 2)
+    type_1_budgets = np.round(np.arange(170, 230.01, 0.01), 2)
+
+    # Convert the budgets to strings and add them to the colors_set
+    colors_set_0 = {f'{{"type": 0, "budget": {budget}}}' for budget in type_0_budgets}
+    colors_set_1 = {f'{{"type": 1, "budget": {budget}}}' for budget in type_1_budgets}
+
+    # Combine the two sets
+    colors_set = colors_set_0.union(colors_set_1)
+    #import pdb; pdb.set_trace()
+    return colors_set

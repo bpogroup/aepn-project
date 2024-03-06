@@ -1005,7 +1005,7 @@ class AEPetriNet(PetriNet):
             # Retrieve current action mask
             obs = self.get_observation()
             action_masks = env.action_masks()
-            action, _states = model.predict(obs, action_masks=action_masks)
+            action, _states = model.predict(obs, action_masks=action_masks, deterministic=True)
             obs, rewards, done, info = env.step(action)
             t_rewards += rewards  # unused
 
@@ -1094,13 +1094,13 @@ class AEPetriNet(PetriNet):
 #TODO: collapse the number of places in the network by merging places with the same marking and the same incoming and outgoing arcs adding a feature that counts the number of occurrences of the same token in the place
 if __name__ == "__main__":
 
-    observation_type = 'graph' #'vector' for old version, 'graph' for new version
+    observation_type = 'vector' #'vector' for old version, 'graph' for new version
 
     test_simple_aepn = False #test a simple aepn for testing purposes
     test_task_assignment = False #test a-e cpn for task assignment problem
-    test_simple_consulting_firm = False
+    test_simple_consulting_firm = True
     test_consulting_firm = False
-    test_hard_consulting_firm = True
+    test_hard_consulting_firm = False
 
     test_simulation = False
     test_training = False
@@ -1112,7 +1112,7 @@ if __name__ == "__main__":
 
     #for testing
     length = max_length
-    replications = 1000
+    replications = 100
 
     import platform
 
@@ -1173,11 +1173,29 @@ if __name__ == "__main__":
 
         elif test_consulting_firm:
             pn.add_place(Place("arrival", colors_set={'{"type":0}','{"type":1}'}))
-            pn.add_place(Place("waiting", colors_set={'{"type":0,"budget":}','{"type":1,"budget":}'}))
+            pn.add_place(Place("waiting", colors_set=generate_vector_color_set()))
+            pn.add_place(Place("resources", colors_set={'{"id":0}'}))
+
+            pn.add_transition(TaggedTransition("arrive", tag='e', reward=0))
+            pn.add_transition(TaggedTransition("start", tag='a', reward='get_budget_str'))
+            # pn.add_transition(TaggedTransition("complete", tag='e', reward='get_budget'))
+
+            pn.add_arc_by_ids("arrival", "arrive", "x")
+            pn.add_arc_by_ids("arrive", "arrival", "x", time_expression=1)
+            pn.add_arc_by_ids("arrive", "waiting", "randomize_budget_uniform_str", time_expression=0)
+
+            pn.add_arc_by_ids("waiting", "start",
+                              "case")  # HERE if this and the next line are switched, it breaks. TODO: modify get_actions
+            pn.add_arc_by_ids("resources", "start", "resource")
+            pn.add_arc_by_ids("start", "resources", "resource", time_expression=1)
+
+            pn.add_mark_by_id("arrival", '{"type":0}', 0)  # CAREFUL: no spaces!!
+            pn.add_mark_by_id("arrival", '{"type":1}', 0)
+            pn.add_mark_by_id("resources", '{"id":0}', 0)  # HERE: same as before!
 
         if test_training:
             start_time = time.time()
-            pn.training_run(1000000, max_length, False)
+            pn.training_run(100000, max_length, False)
             print("TRAINING TIME: --- %s seconds ---" % (time.time() - start_time))
         elif test_inference:
 

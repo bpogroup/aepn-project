@@ -81,6 +81,7 @@ class AEPN_Env(Env):
 	# define mask based on current environment observation (only for vector observations)
 	def action_masks(self) -> List[bool]:
 		v_a = self.pn.get_valid_actions()
+		import pdb; pdb.set_trace()
 		valid_actions = [True if i in v_a else False for i in self.pn_actions]
 		self.valid_actions = valid_actions
 		return valid_actions

@@ -1114,12 +1114,12 @@ if __name__ == "__main__":
         f_t.close()
     elif platform.system() == 'Linux':
         # color functions
-        f = open('/new_color_functions.py', 'r')
+        f = open('additional_functions/new_color_functions.py', 'r')
         temp = f.read()
         f.close()
 
         # time functions
-        f_t = open('/time_functions.py', 'r')
+        f_t = open('additional_functions/time_functions.py', 'r')
         temp_t = f_t.read()
         f_t.close()
     else:

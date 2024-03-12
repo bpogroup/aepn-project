@@ -1,38 +1,38 @@
-import random
 import itertools
 import shutil
-from abc import ABC, abstractclassmethod
+import copy
+import time
 import os
-
+import platform
 import torch
+
+from abc import ABC, abstractclassmethod
 from sb3_contrib import MaskablePPO
 from sb3_contrib.common.maskable.policies import MaskableActorCriticPolicy
 from stable_baselines3.common.logger import configure
-import copy
-import time
 from torch_geometric.data import HeteroData
 
-from heuristics import SPT
-from train import make_parser, make_env, make_agent, make_logdir
-
 try:
-    from .gym_env.additional_functions.function_dispatcher import FunctionDispatcher
-    from .gym_env import new_aepn_env as aepn_env
+    from .train import make_parser, make_env, make_agent, make_logdir
+    from .heuristics import SPT
+    from .gym_env import new_aepn_env
     from .gym_env import aepn_env as old_aepn_env
     from .pncomponents import Transition, TaggedTransition, Place, Token, Arc, ClockWrapper
-    from .gym_env.additional_functions.new_color_functions import *
-    from .gym_env.additional_functions.time_functions import *
-    from .gym_env.additional_functions import new_color_functions
-    from .gym_env.additional_functions import time_functions
+    from .additional_functions import *
+    from .additional_functions.function_dispatcher import FunctionDispatcher
+    from .additional_functions.time_functions import *
+    from .additional_functions import time_functions
 except:
-    from gym_env.additional_functions.function_dispatcher import FunctionDispatcher
+    from train import make_parser, make_env, make_agent, make_logdir
+    from heuristics import SPT
+    from additional_functions.function_dispatcher import FunctionDispatcher
     from gym_env import new_aepn_env
     from gym_env import aepn_env as old_aepn_env
     from pncomponents import Transition, TaggedTransition, Place, Token, Arc, ClockWrapper
-    from gym_env.additional_functions.new_color_functions import *
-    from gym_env.additional_functions.time_functions import *
-    from gym_env.additional_functions import new_color_functions
-    from gym_env.additional_functions import time_functions
+    from additional_functions.new_color_functions import *
+    from additional_functions import *
+    from additional_functions import new_color_functions
+    from additional_functions import time_functions
 class AbstractPetriNet(ABC):
     @abstractclassmethod
     def __init__(self):
@@ -345,9 +345,9 @@ class AEPetriNet(PetriNet):
         super().__init__(additional_functions)
 
         if platform.system() == 'Windows':
-            self.dispatcher = FunctionDispatcher(["cpn.gym_env.additional_functions.new_color_functions", "cpn.gym_env.additional_functions.time_functions"], clock = self.clock)
+            self.dispatcher = FunctionDispatcher(["cpn.additional_functions.new_color_functions", "cpn.additional_functions.time_functions"], clock = self.clock)
         elif platform.system() == 'Linux':
-            self.dispatcher = FunctionDispatcher(["gym_env.additional_functions.new_color_functions", "gym_env.additional_functions.time_functions"], clock = self.clock)
+            self.dispatcher = FunctionDispatcher(["cpn.additional_functions.new_color_functions", "cpn.additional_functions.time_functions"], clock = self.clock)
 
         self.actions_dict = None
         self.rewards = 0
@@ -1013,34 +1013,21 @@ class AEPetriNet(PetriNet):
         return total_reward_ppo
 
 
-    def new_testing_run(self, length, additional_functions=None, out_model_name="network-100.pth", out_folder_name='./out'):
+    def new_testing_run(self, length, additional_functions=None, out_model_name="network-250.pth", out_folder_name='./out'):
         """
-        Loads a trained model and performs length steps of evaluation
+        Loads a trained model and performs length steps of evaluation with observation_type = 'graph'
         """
         self.length = length
 
         env = new_aepn_env.AEPN_Env(self)
-        #metadata = self.get_observation()['graph'].metadata()
-        #metadata = env.reset()['graph'].metadata()
-        #import pdb; pdb.set_trace()
         out_path = os.path.join('C:', os.sep, 'Users', '20215143', 'tue_repos', 'cpn_flex', 'cpn-project', 'cpn', 'data', 'train', 'run', out_model_name)#os.path.join('out', out_model_name)
         #load state dict
-        model = torch.load(out_path)#HeteroActor(1, metadata)
-        #model.reset_parameters()
-        # Load the parameters
-        #state_dict = torch.load(out_path)
-        # Set the model to evaluation mode
-        #model.load_state_dict(state_dict)
-        #model.eval()
-
-
+        model = torch.load(out_path)
 
         done = False
         t_rewards = 0
         while not done:
-            # Retrieve current action mask
             obs = self.get_observation()
-            #action_masks = env.action_masks()
             action_probs = model(obs)
             action = int(torch.argmax(action_probs)) #get the maximum probability action
             obs, rewards, done, truncated, info = env.step(action)
@@ -1091,16 +1078,15 @@ class AEPetriNet(PetriNet):
 
         return self.get_observation(), self.clock > self.length or not active_model, i
 
-#TODO: collapse the number of places in the network by merging places with the same marking and the same incoming and outgoing arcs adding a feature that counts the number of occurrences of the same token in the place
 if __name__ == "__main__":
 
-    observation_type = 'vector' #'vector' for old version, 'graph' for new version
+    observation_type = 'graph' #'vector' for old version, 'graph' for new version
 
     test_simple_aepn = False #test a simple aepn for testing purposes
     test_task_assignment = False #test a-e cpn for task assignment problem
-    test_simple_consulting_firm = True
+    test_simple_consulting_firm = False
     test_consulting_firm = False
-    test_hard_consulting_firm = False
+    test_hard_consulting_firm = True
 
     test_simulation = False
     test_training = False
@@ -1112,28 +1098,28 @@ if __name__ == "__main__":
 
     #for testing
     length = max_length
-    replications = 100
+    replications = 1000
 
     import platform
 
     if platform.system() == 'Windows':
         # color functions
-        f = open('./gym_env/additional_functions/new_color_functions.py', 'r')
+        f = open('additional_functions/new_color_functions.py', 'r')
         temp = f.read()
         f.close()
 
         # time functions
-        f_t = open('./gym_env/additional_functions/time_functions.py', 'r')
+        f_t = open('additional_functions/time_functions.py', 'r')
         temp_t = f_t.read()
         f_t.close()
     elif platform.system() == 'Linux':
         # color functions
-        f = open('/gpfs/home6/lobianco/cpn-project/cpn/gym_env/additional_functions/new_color_functions.py', 'r')
+        f = open('/new_color_functions.py', 'r')
         temp = f.read()
         f.close()
 
         # time functions
-        f_t = open('/gpfs/home6/lobianco/cpn-project/cpn/gym_env/additional_functions/time_functions.py', 'r')
+        f_t = open('/time_functions.py', 'r')
         temp_t = f_t.read()
         f_t.close()
     else:

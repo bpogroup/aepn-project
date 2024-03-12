@@ -5,29 +5,29 @@ import argparse
 import datetime
 import random
 import json
-import shutil
+
 
 import numpy as np
 import os
 
 import torch
+import torch.nn as nn
 from torch_geometric.utils import scatter
-from torch_geometric.nn import GCNConv, GATConv, to_hetero, HANConv, GlobalAttention
+from torch_geometric.nn import GATConv, HANConv
 from torch_geometric.utils import softmax as pyg_softmax
 from torch.nn.functional import softmax
 
 # import AEPN_Env from new_aepn_env.py
-from gym_env import new_aepn_env
 try:
     from .gym_env import new_aepn_env as aepn_env
+    from .gym_env.new_aepn_env import AEPN_Env
+    from .pg import PGAgent, PPOAgent
 except ImportError:
     from gym_env import new_aepn_env as aepn_env
+    from gym_env.new_aepn_env import AEPN_Env
+    from pg import PGAgent, PPOAgent
 
-from gym_env.new_aepn_env import AEPN_Env
-from pg import PGAgent, PPOAgent
 
-import torch.nn.functional as F
-import torch.nn as nn
 train = True
 
 def make_parser():
@@ -196,39 +196,6 @@ class ActorCritic(torch.nn.Module):
     def load_weights(self, filename):
         self.load_state_dict(torch.load(filename))
 
-# Define a simple GNN model using PyTorch Geometric
-class Actor(ActorCritic):
-    def __init__(self, in_channels, out_channels):
-        super(Actor, self).__init__()
-        # self.conv1 = GCNConv(in_channels, 16)
-        #self.conv2 = GCNConv(16, out_channels)
-        self.conv1 = GATConv(in_channels, 16, heads=2)  # 2 attention heads
-        self.conv2 = GATConv(16*2, out_channels)  # we multiply by 2 due to the 2 attention heads
-
-
-    def forward(self, data):
-        #check if data contains key 'graph'
-        if 'graph' in data.keys():
-            x, edge_index = torch.from_numpy(data['graph'].nodes).type(torch.float32), torch.from_numpy(data['graph'].edge_links)#data["x"], data["edge_index"]
-        else:
-            x = data['x'].float() #torch.cat(data['x'], dim=1)
-            edge_index = data['edge_index']#data.edge_index
-            index = data['index']
-
-        x.requires_grad_()
-        #edge_index.requires_grad = True
-
-        x = self.conv1(x, edge_index).relu()
-        x = self.conv2(x, edge_index)
-        if 'graph' in data.keys():
-            x = softmax(x, dim=0)
-        else:
-            x = pyg_softmax(x, index)
-        return x
-
-
-
-
 
 class HeteroActor(ActorCritic):
     def __init__(self, output_size, metadata):
@@ -241,9 +208,7 @@ class HeteroActor(ActorCritic):
         self.decoder = nn.Sequential(
             nn.Linear(output_size, 64),
             nn.ReLU(),
-            nn.Linear(64, 1),
-            #nn.ReLU(),
-            #nn.Linear(32, 1)
+            nn.Linear(64, 1)
         )
 
     def forward(self, data):
@@ -287,7 +252,6 @@ class HeteroCritic(ActorCritic):
         self.lin = nn.Linear(16, 1)
 
     def forward(self, data):
-        #x, edge_index = data['graph'].nodes.type(torch.float32), data['graph'].edge_links
         if 'graph' in data.keys():
             x, metadata = data['graph'], data['graph'].metadata()
         else:
@@ -299,54 +263,17 @@ class HeteroCritic(ActorCritic):
         edge_index_dict = x.edge_index_dict
 
         x_dict = self.conv1(x_dict, edge_index_dict)#, edge_index).relu()
-        #x_dict = {k: F.relu(v) for k, v in x_dict.items() if v is not None}
         if 'graph' in data.keys():
-            #TODO: action masking
-            #import pdb; pdb.set_trace()
             x_dict = {k: v.sum(dim=0, keepdim=True) for k, v in x_dict.items() if v is not None}
             x = sum(x_dict.values()) #simple aggregation
 
         else:
-            #x_dict = {k: scatter(v, index, dim=0, reduce='sum') for k, v in x_dict.items() if v is not None}
             x_dict = scatter(x_dict['a_transition'], index, dim=0, reduce='sum')
             x = x_dict
 
         x = self.lin(x)
-        #out = torch.mean(torch.stack([v for v in x_dict.values()]), dim=0) #TODO: check if this is the correct way to aggregate the outputs of the different node types
+
         return x
-
-        #x = self.conv1(x.x_dict, x.edge_index_dict)
-        #x = self.conv2(x.x_dict, x.edge_index_dict)
-        #x = x.sum(dim=0, keepdim=True) #TODO: reintroduce index in the observation
-
-        #return x_dict
-
-class Critic(ActorCritic):
-    def __init__(self, in_channels):
-        super(Critic, self).__init__()
-        self.conv1 = GATConv(in_channels, 16, heads=2, dropout=0.6)
-        self.conv2 = GATConv(16 * 2, 1, heads=1, concat=False, dropout=0.6)
-
-    def forward(self, data):
-        if 'graph' in data.keys():
-            x, edge_index = torch.from_numpy(data['graph'].nodes).type(torch.float32), torch.from_numpy(
-                data['graph'].edge_links)
-        else:
-            x = data['x'].float() #torch.cat(data['x'], dim=1)
-            edge_index = data['edge_index']#data.edge_index
-            index = data['index']
-
-        x = self.conv1(x, edge_index).relu()
-        x = self.conv2(x, edge_index)
-
-        if 'graph' in data.keys():
-            x = x.sum(dim=0, keepdim=True)#.detach()  # Sum over nodes
-        else:
-            x = scatter(x, index, dim=0, reduce='sum')#.detach()
-        return x  # Extract single output from tensor
-
-
-
 
 def make_env(args, aepn = None):
     """Return the training environment for this run."""
@@ -363,12 +290,12 @@ def make_policy_network(args, metadata=None):
     if args.environment == 'ActionEvolutionPetriNetEnv':
         if args.load_policy_network:
             policy_network = torch.load(os.path.join(os.getcwd(), args.logdir, args.name, args.policy_network))
-        else:
+        elif args.environment == 'ActionEvolutionPetriNetEnv':
             policy_network = HeteroActor(16, metadata=metadata)
+        else:
+            raise Exception("No policy network to load!")
     else:
         raise Exception("Unknown environment! Are you sure it is spelled correctly?")
-    #if args.policy_weights != "":
-    #    policy_network.load_weights(os.path.join(args.logdir, args.name, args.policy_weights))
     return policy_network
 
 
@@ -389,10 +316,6 @@ def make_agent(args, metadata=None):
     """Return the agent for this run."""
     policy_network = make_policy_network(args, metadata=metadata)
     value_network = make_value_network(args, metadata=metadata)
-    #currently using HANConv instead of to_hetero
-    #if node_types and edge_types:
-    #    policy_network = to_hetero(policy_network, node_types, edge_types)
-    #    value_network = to_hetero(value_network, node_types, edge_types)
 
     if args.algorithm == 'pg':
         agent = PGAgent(policy_network=policy_network,policy_lr=args.policy_lr, policy_updates=args.policy_updates,
@@ -440,7 +363,7 @@ if __name__ == '__main__':
         random.seed(args.agent_seed)
         torch.manual_seed(args.agent_seed)
         torch.cuda.manual_seed(args.agent_seed)
-        #TODO: two more lines for cuda
+        #TODO: complete cuda setting
 
     env = make_env(args)
     agent = make_agent(args)
@@ -454,7 +377,6 @@ if __name__ == '__main__':
                     save_freq=args.save_freq, logdir=logdir, verbose=args.verbose,
                     max_episode_length=args.max_episode_length, batch_size=args.batch_size)
     else:
-        #shutil.copy(args.policy_weights, os.path.join(logdir, "policy.h5"))
         with open(os.path.join(logdir, "results.csv"), 'w') as f:
             f.write("Return,Length\n")
         for _ in range(args.episodes):

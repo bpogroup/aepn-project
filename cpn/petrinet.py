@@ -1,9 +1,7 @@
 import random
-import json
 import itertools
 from abc import ABC, abstractclassmethod
 import os
-import logging
 from sb3_contrib import MaskablePPO
 from sb3_contrib.common.maskable.policies import MaskableActorCriticPolicy
 from stable_baselines3.common.logger import configure
@@ -12,11 +10,11 @@ import time
 try:
     from .gym_env import aepn_env
     from .pncomponents import Transition, TaggedTransition, Place, Token, Arc
-    from .gym_env.additional_functions.color_functions import *
+    from cpn.additional_functions.color_functions import *
 except:
     from gym_env import aepn_env
     from pncomponents import Transition, TaggedTransition, Place, Token, Arc
-    from gym_env.additional_functions.color_functions import *
+    from cpn.additional_functions import *
 
 class AbstractPetriNet(ABC):
     @abstractclassmethod
@@ -695,7 +693,7 @@ if __name__ == "__main__":
         return test
 
     '''
-        f = open('./gym_env/additional_functions/color_functions.py', 'r')
+        f = open('additional_functions/color_functions.py', 'r')
         temp = f.read()
         f.close()
         my_functions = temp 
@@ -732,7 +730,7 @@ if __name__ == "__main__":
             print(test_binding)
             
     elif test_task_assignment:
-        f = open('./gym_env/additional_functions/color_functions.py', 'r')
+        f = open('additional_functions/color_functions.py', 'r')
         temp = f.read()
         f.close()
         my_functions = temp 

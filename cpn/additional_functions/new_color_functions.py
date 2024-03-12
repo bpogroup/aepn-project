@@ -236,7 +236,7 @@ def randomize_budget_and_patience(CLOCK, x):
     x['budget'] = round(random.gauss(mu, sigma), 2)  # budget is rounded to 2 decimal places
 
     #import pdb; pdb.set_trace()
-    x['patience'] = CLOCK + random.expovariate(1/2) #the interarrival time is 1, so the patience should be on average higher than the arrivals
+    x['patience'] = CLOCK + 1 + random.expovariate(1/2) #the interarrival time is 1, so the patience should be on average higher than the arrivals
     x['arrival_time'] = CLOCK
     return x
 
@@ -291,5 +291,4 @@ def generate_vector_color_set():
 
     # Combine the two sets
     colors_set = colors_set_0.union(colors_set_1)
-    #import pdb; pdb.set_trace()
     return colors_set

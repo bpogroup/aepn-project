@@ -8,9 +8,6 @@ import importlib
 import inspect
 
 class FunctionDispatcher:
-#    def __init__(self):
-#        self.functions = color_functions
-#        self.time_functions = time_functions
 
     def __init__(self, module_names, clock):
         self.clock = clock
@@ -23,7 +20,6 @@ class FunctionDispatcher:
                     self.commands[attr_name] = attr
 
     def dispatch(self, command_name, clock=None, **args):
-        #import pdb; pdb.set_trace()
         if command_name in args.keys():
             return args[command_name] #if the input identity function
         elif command_name in self.commands:

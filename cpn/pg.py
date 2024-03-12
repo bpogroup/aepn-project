@@ -9,13 +9,11 @@ Currently includes policy gradient agent (i.e., Monte Carlo policy
 gradient or vanilla policy gradient) and proximal policy optimization
 agent.
 """
-
 import numpy as np
 from torch_geometric.data import Data, Batch
 from torch_geometric.loader import DataLoader
 import torch
 from torch.utils.tensorboard import SummaryWriter
-#from non_fixed_cross_entropy_loss import 
 
 torch.autograd.set_detect_anomaly(True)
 
